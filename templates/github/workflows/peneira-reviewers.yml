@@ -1,0 +1,40 @@
+name: peneira-reviewers
+
+# Separate workflow with its own concurrency group: editing the PR description or labels
+# never cancels a review that is already running.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: peneira-reviewers-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  reviewers:
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: __ACTION_REF__
+        with:
+          step: reviewers
+          install-claude-code: 'true'
+          install-python-tools: '__PY_TOOLS__'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PONYTAIL_MODEL: ${{ vars.PONYTAIL_MODEL }}
+          REVIEW_API_KEY: ${{ secrets.REVIEW_API_KEY }}
+          REVIEW_PROVIDER: ${{ vars.REVIEW_PROVIDER }}
+          REVIEW_MODEL: ${{ vars.REVIEW_MODEL }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}

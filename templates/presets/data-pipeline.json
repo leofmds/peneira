@@ -1,0 +1,37 @@
+{
+  "ticket": { "urlTemplate": "https://linear.app/YOUR-WORKSPACE/issue/{id}" },
+  "risk": {
+    "paths": [
+      "**/auth/**", "**/oauth/**", "**/permissions/**", "**/billing/**", "**/payments/**", "**/migrations/**",
+      "**/ingestion/**", "**/reconciliation/**", "**/integrations/**", "**/queue*/**", "**/workers/**", "**/backfill*/**"
+    ],
+    "addedLinePatterns": [
+      "\\b(DROP|TRUNCATE|ALTER)\\s+TABLE\\b",
+      "\\bDELETE\\s+FROM\\b",
+      "\\bOPTIMIZE\\s+TABLE\\b.*\\bFINAL\\b",
+      "process\\.env\\.[A-Z_]*(SECRET|TOKEN|KEY)",
+      "\\b(eval|new Function)\\s*\\(",
+      "\\bretries?\\s*[:=]",
+      "\\bSELECT\\s+\\*\\s+FROM\\b"
+    ]
+  },
+  "reviewers": {
+    "ponytail": { "enabled": true, "runFor": "all" },
+    "llm": {
+      "enabled": true,
+      "runFor": "ai-or-risk",
+      "provider": "openai",
+      "model": null,
+      "focus": "Backend / data infrastructure: Node.js, ingestion pipelines, ClickHouse, Snowflake, Postgres, third-party integrations. Pay special attention to idempotency and duplicate events, retries and timeouts, partial failure mid-batch, ordering assumptions, null / missing / oversized inputs, multi-tenant isolation, schema migrations and backfills, authorization at resource boundaries, secrets handling, and unbounded queries or memory."
+    },
+    "semgrep": {
+      "type": "sarif",
+      "enabled": true,
+      "prefix": "S",
+      "runFor": "all",
+      "requires": "semgrep",
+      "command": "semgrep scan --config p/javascript --config p/typescript --config p/nodejsscan --config p/sql-injection --config p/secrets --sarif --quiet --baseline-commit {base}"
+    }
+  },
+  "triage": { "linearTeamKey": "PLAT" }
+}

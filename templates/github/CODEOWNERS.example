@@ -1,0 +1,7 @@
+# Copy to .github/CODEOWNERS and replace the handles. High-risk paths always need a senior
+# human reviewer, regardless of who (or what) wrote the code.
+**/auth/**              @your-org/seniors
+**/migrations/**        @your-org/seniors
+/.github/               @your-org/seniors
+/.peneira/          @your-org/seniors
+/CLAUDE.md              @your-org/seniors

@@ -1,0 +1,53 @@
+name: peneira
+description: Gate, review and store findings for human triage. Humans decide what gets posted.
+inputs:
+  step:
+    description: policy | reviewers | metrics
+    required: true
+  only:
+    description: Comma-separated reviewer names (reviewers step only)
+    required: false
+    default: ''
+  install-claude-code:
+    description: Install Claude Code (needed by the ponytail reviewer)
+    required: false
+    default: 'false'
+  install-python-tools:
+    description: Space-separated pip packages to install first (e.g. "semgrep" for a sarif reviewer)
+    required: false
+    default: ''
+  github-token:
+    description: Token used to comment and label
+    required: false
+    default: ${{ github.token }}
+outputs:
+  is_ai:
+    description: Whether the PR looks AI-generated (policy step)
+    value: ${{ steps.run.outputs.is_ai }}
+  high_risk:
+    description: Whether the PR touches risky code (policy step)
+    value: ${{ steps.run.outputs.high_risk }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - if: inputs.install-claude-code == 'true'
+      shell: bash
+      run: npm install -g @anthropic-ai/claude-code
+    - if: inputs.install-python-tools != ''
+      shell: bash
+      env:
+        RG_PY: ${{ inputs.install-python-tools }}
+      run: python3 -m pip install --quiet $RG_PY
+    - id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        RG_STEP: ${{ inputs.step }}
+        RG_ONLY: ${{ inputs.only }}
+      run: |
+        args=(ci "$RG_STEP")
+        if [ -n "$RG_ONLY" ]; then args+=(--only "$RG_ONLY"); fi
+        node "$GITHUB_ACTION_PATH/bin/peneira.mjs" "${args[@]}"
