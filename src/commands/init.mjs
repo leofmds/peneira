@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONFIG_PATH } from '../config.mjs';
-import { REPO_SKILL } from '../reviewers/ponytail.mjs';
+import { REPO_SKILL, RUNNERS } from '../reviewers/ponytail.mjs';
 
 const TEMPLATES = join(dirname(fileURLToPath(import.meta.url)), '../../templates');
 const tpl = (p) => readFileSync(join(TEMPLATES, p), 'utf8');
@@ -21,16 +21,18 @@ export const INIT_HELP = `Usage: peneira init [options]
 
   --preset NAME        default | data-pipeline (default: default)
   --action-ref REF     Action used by the workflows (default: ${DEFAULT_ACTION_REF}; set it for a fork or a pinned SHA)
+  --runner NAME        claude | cursor | codex (default: claude)
   --with-ponytail      Vendor the ponytail-review skill (pinned, MIT) into ${REPO_SKILL}
   --force              Overwrite existing files
   --dry-run            Show what would be written`;
 
 export async function runInit({ argv = [], cwd, env, io, fetchImpl = globalThis.fetch }) {
-  const o = { preset: 'default', actionRef: null, ponytail: false, force: false, dryRun: false };
+  const o = { preset: 'default', actionRef: null, runner: null, ponytail: false, force: false, dryRun: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--preset') o.preset = argv[++i];
     else if (a === '--action-ref') o.actionRef = argv[++i];
+    else if (a === '--runner') o.runner = argv[++i];
     else if (a === '--with-ponytail') o.ponytail = true;
     else if (a === '--force') o.force = true;
     else if (a === '--dry-run') o.dryRun = true;
@@ -38,21 +40,33 @@ export async function runInit({ argv = [], cwd, env, io, fetchImpl = globalThis.
     else throw new Error(`Unknown option ${a}`);
   }
   if (!existsSync(join(TEMPLATES, `presets/${o.preset}.json`))) throw new Error(`Unknown preset "${o.preset}"`);
+  o.runner = o.runner || 'claude';
+  if (!RUNNERS[o.runner]) throw new Error(`Unknown runner "${o.runner}" (claude, cursor, codex)`);
   if (!existsSync(join(cwd, '.git'))) throw new Error('Run peneira init at the root of a git repository.');
 
   const c = io.color;
   const preset = JSON.parse(tpl(`presets/${o.preset}.json`));
+  preset.reviewers = { ...(preset.reviewers || {}), ponytail: { ...(preset.reviewers?.ponytail || {}), runner: o.runner } };
   const pyTools = Object.values(preset.reviewers || {}).filter((r) => r.type === 'sarif' && r.requires && r.enabled !== false)
     .map((r) => r.requires).join(' ');
   const actionRef = o.actionRef || DEFAULT_ACTION_REF;
-  const wf = (name) => tpl(`github/workflows/${name}`).replaceAll('__ACTION_REF__', actionRef).replaceAll('__PY_TOOLS__', pyTools);
+  const secret = RUNNERS[o.runner].secret;
+  const auth = `${secret}: \${{ secrets.${secret} }}`;
+  const wf = (name) => tpl(`github/workflows/${name}`)
+    .replaceAll('__ACTION_REF__', actionRef)
+    .replaceAll('__PY_TOOLS__', pyTools)
+    .replaceAll('__AGENT_RUNNER__', o.runner)
+    .replaceAll('__PONYTAIL_AUTH__', auth);
 
-  const claudeMd = tpl('claude/CLAUDE.md').replace('{{PROJECT_RULES}}', tpl(`presets/${o.preset}.rules.md`));
+  const agentsMd = tpl('agents/AGENTS.md').replace('{{PROJECT_RULES}}', tpl(`presets/${o.preset}.rules.md`));
+  const claudeMd = '@AGENTS.md\n';
   const files = [
     [CONFIG_PATH, `${JSON.stringify(preset, null, 2)}\n`],
     ['.github/pull_request_template.md', tpl('github/pull_request_template.md')],
     ['.github/CODEOWNERS.example', tpl('github/CODEOWNERS.example')],
     ['docs/spec-template.md', tpl('docs/spec-template.md')],
+    ['.agents/workflows/pre-pr.md', tpl('agents/workflows/pre-pr.md')],
+    ['.agents/workflows/pr-review.md', tpl('agents/workflows/pr-review.md')],
     ['.claude/commands/pre-pr.md', tpl('claude/commands/pre-pr.md')],
     ['.claude/commands/pr-review.md', tpl('claude/commands/pr-review.md')],
     ['.github/workflows/peneira.yml', wf('peneira.yml')],
@@ -60,7 +74,7 @@ export async function runInit({ argv = [], cwd, env, io, fetchImpl = globalThis.
     ['.github/workflows/peneira-metrics.yml', wf('peneira-metrics.yml')],
     ['.github/workflows/ci-checks.yml', wf('ci-checks.yml')],
   ];
-  // Never clobber an existing CLAUDE.md: offer ours next to it for a manual merge.
+  files.push(existsSync(join(cwd, 'AGENTS.md')) && !o.force ? ['.peneira/AGENTS.peneira.md', agentsMd] : ['AGENTS.md', agentsMd]);
   files.push(existsSync(join(cwd, 'CLAUDE.md')) && !o.force ? ['.peneira/CLAUDE.peneira.md', claudeMd] : ['CLAUDE.md', claudeMd]);
 
   if (o.ponytail) {
@@ -86,13 +100,17 @@ export async function runInit({ argv = [], cwd, env, io, fetchImpl = globalThis.
     written.push(rel);
   }
 
+  const merges = [];
+  if (files.some(([r]) => r === '.peneira/AGENTS.peneira.md')) merges.push('Merge .peneira/AGENTS.peneira.md into your AGENTS.md.');
+  if (files.some(([r]) => r === '.peneira/CLAUDE.peneira.md')) merges.push('Merge .peneira/CLAUDE.peneira.md into your CLAUDE.md.');
+  const mergeNote = merges.map((m, i) => `\n  ${4 + i}. ${m}`).join('');
   io.print(`${o.dryRun ? 'Would write' : 'Wrote'}:`);
   for (const f of written) io.print(`  ${c.green('+')} ${f}`);
   for (const f of skipped) io.print(`  ${c.dim('=')} ${f} ${c.dim('(exists; --force to overwrite)')}`);
   io.print(`\nNext steps:
   1. Review ${CONFIG_PATH} (risk paths, ticket URL, reviewer models).
-  2. Add secrets: ANTHROPIC_API_KEY, REVIEW_API_KEY, LINEAR_API_KEY (optional).
-  3. Copy .github/CODEOWNERS.example to .github/CODEOWNERS and set the handles.${files.some(([r]) => r.endsWith('CLAUDE.peneira.md')) ? '\n  4. Merge .peneira/CLAUDE.peneira.md into your CLAUDE.md.' : ''}${o.ponytail ? '' : `\n  ${c.yellow('!')} ponytail-review is not vendored: run again with --with-ponytail, or install the ponytail plugin.`}
+  2. Add secrets: ${secret}, REVIEW_API_KEY, LINEAR_API_KEY (optional).
+  3. Copy .github/CODEOWNERS.example to .github/CODEOWNERS and set the handles.${mergeNote}${o.ponytail ? '' : `\n  ${c.yellow('!')} ponytail-review is not vendored: run again with --with-ponytail, or install the ponytail plugin.`}
 Then: peneira <PR number>`);
   return 0;
 }

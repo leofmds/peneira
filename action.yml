@@ -9,9 +9,13 @@ inputs:
     required: false
     default: ''
   install-claude-code:
-    description: Install Claude Code (needed by the ponytail reviewer)
+    description: Legacy switch. true installs Claude Code when agent-runner is none.
     required: false
     default: 'false'
+  agent-runner:
+    description: Ponytail CLI to install (claude, cursor, codex, or none).
+    required: false
+    default: 'none'
   install-python-tools:
     description: Space-separated pip packages to install first (e.g. "semgrep" for a sarif reviewer)
     required: false
@@ -33,9 +37,18 @@ runs:
     - uses: actions/setup-node@v4
       with:
         node-version: 22
-    - if: inputs.install-claude-code == 'true'
+    - if: inputs.agent-runner == 'claude' || (inputs.agent-runner == 'none' && inputs.install-claude-code == 'true')
       shell: bash
       run: npm install -g @anthropic-ai/claude-code
+    - if: inputs.agent-runner == 'cursor'
+      shell: bash
+      run: |
+        set -o pipefail
+        curl https://cursor.com/install -fsS | bash
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+    - if: inputs.agent-runner == 'codex'
+      shell: bash
+      run: npm install -g @openai/codex
     - if: inputs.install-python-tools != ''
       shell: bash
       env:

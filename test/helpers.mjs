@@ -132,7 +132,7 @@ export const PONYTAIL_FINDINGS = [
 ];
 
 export function withSkill(cwd) {
-  write(cwd, { '.claude/skills/ponytail-review/SKILL.md': '---\nname: ponytail-review\n---\nReview.\n' });
+  write(cwd, { '.agents/skills/ponytail-review/SKILL.md': '---\nname: ponytail-review\n---\nReview.\n' });
 }
 
 export { scriptedIO };

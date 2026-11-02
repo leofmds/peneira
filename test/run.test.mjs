@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, mkdtempSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.mjs';
 import { makeFinding } from '../src/findings.mjs';
+import * as ponytail from '../src/reviewers/ponytail.mjs';
 import { MARKERS, withData, readStore } from '../src/store.mjs';
 import { fixtureRepo, fakeGitHub, fakeClaude, withSkill, scriptedIO, PONYTAIL_FINDINGS } from './helpers.mjs';
 
@@ -138,3 +139,54 @@ test('--list --json gives the /pr-review command everything it needs', withFetch
   assert.deepEqual(json.findings.map((f) => f.id), ['P1', 'P2', 'P3', 'P4']);
   assert.deepEqual(Object.keys(json.findings[0].parts), ['What this is', 'Problem', 'Fix', 'If we skip it']);
 }));
+
+test('each runner: read-only flag, and its output becomes findings', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'rg-runners-'));
+  mkdirSync(join(cwd, '.agents/skills/ponytail-review'), { recursive: true });
+  writeFileSync(join(cwd, '.agents/skills/ponytail-review/SKILL.md'), '---\nname: ponytail-review\n---\n');
+  const log = join(cwd, 'argv.json');
+  const data = { what_this_change_does: 'Adds a dedupe column.', verdict: 'fix 1 first', findings: PONYTAIL_FINDINGS };
+  const text = `What this change does: ...\n\n\`\`\`json\n${JSON.stringify(data)}\n\`\`\``;
+  const bin = join(cwd, 'fake-agent');
+  writeFileSync(bin, `#!/usr/bin/env node
+const fs = require('fs');
+const argv = process.argv.slice(2);
+fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify(argv));
+const text = ${JSON.stringify(text)};
+const o = argv.indexOf('-o');
+if (o >= 0) fs.writeFileSync(argv[o + 1], text);
+else process.stdout.write(JSON.stringify({ result: text }));
+`);
+  chmodSync(bin, 0o755);
+  const bins = { claude: 'CLAUDE_BIN', cursor: 'CURSOR_AGENT_BIN', codex: 'CODEX_BIN' };
+  const readOnly = {
+    claude: (argv) => argv[argv.indexOf('--disallowedTools') + 1] === 'Edit,Write,NotebookEdit',
+    cursor: (argv) => argv[argv.indexOf('--mode') + 1] === 'ask',
+    codex: (argv) => argv[argv.indexOf('--sandbox') + 1] === 'read-only',
+  };
+  for (const runner of ['claude', 'cursor', 'codex']) {
+    const result = await ponytail.run({
+      name: 'ponytail', conf: { runner, prefix: 'P' }, cwd, base: 'a', head: 'b',
+      env: { [bins[runner]]: bin, PATH: process.env.PATH },
+    });
+    const argv = JSON.parse(readFileSync(log, 'utf8'));
+    assert.ok(readOnly[runner](argv), argv.join(' '));
+    assert.ok(argv.some((a) => a.includes('ponytail-review')));
+    assert.equal(result.findings.length, 4);
+    assert.equal(result.findings[0].id, 'P1');
+    assert.equal(result.findings[0].title, 'Retries insert duplicates');
+    if (runner === 'claude') assert.ok(argv.includes('--max-turns'));
+    else assert.equal(argv.includes('--max-turns'), false);
+    if (runner === 'codex') {
+      assert.ok(argv.includes('--ephemeral'));
+      assert.equal(existsSync(argv[argv.indexOf('-o') + 1]), false);
+    }
+  }
+  await ponytail.run({
+    name: 'ponytail', conf: { runner: 'claude', prefix: 'P' }, cwd, base: 'a', head: 'b',
+    env: { PENEIRA_RUNNER: 'cursor', CURSOR_AGENT_BIN: bin, PATH: process.env.PATH },
+  });
+  const overridden = JSON.parse(readFileSync(log, 'utf8'));
+  assert.equal(overridden[overridden.indexOf('--mode') + 1], 'ask');
+  assert.equal(ponytail.available({ cwd, conf: { runner: 'claude' }, env: { CLAUDE_BIN: '/nonexistent/claude', PATH: process.env.PATH } }).ok, false);
+});

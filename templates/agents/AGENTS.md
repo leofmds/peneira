@@ -1,8 +1,7 @@
 # Agent working rules
 
 These rules exist because every line you write will be reviewed by a human with limited
-attention. Optimize for *reviewability*, not for volume. (Symlink this file as AGENTS.md
-so other agents follow the same rules.)
+attention. Optimize for *reviewability*, not for volume.
 
 ## 1. Work from a spec
 - Every task starts from a Linear ticket. Read it (and its comments) before writing code.

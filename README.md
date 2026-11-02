@@ -104,7 +104,8 @@ only gets what has no place in the code.
 
 ## In Claude Code
 
-`peneira init` adds two commands:
+`peneira init` writes `AGENTS.md` (the shared rules) and the checklists in `.agents/workflows`.
+`CLAUDE.md` is a one-line `@AGENTS.md` import. Two slash commands point at those checklists:
 
 - `/pr-review 14`: Claude runs `peneira 14 --list --json`, walks you through each finding one at a
   time, asks for your decision, and posts with `--decide`. It never decides for you.
@@ -118,12 +119,12 @@ ids), and `runFor`: `all`, `ai` (AI-generated PRs), `ai-or-risk`.
 
 | Type | What it is | Needs |
 |---|---|---|
-| `ponytail` | The [ponytail-review](https://github.com/DietrichGebert/ponytail) skill (MIT) run through Claude Code headless. Reads callers, tests and expected load, not only the diff. | Claude Code CLI; the skill vendored by `init --with-ponytail` or the ponytail plugin |
+| `ponytail` | The [ponytail-review](https://github.com/DietrichGebert/ponytail) skill (MIT), run headless through Claude Code, the Cursor agent CLI, or Codex. Reads callers, tests and expected load, not only the diff. Read-only: Claude's tool allowlist, Cursor ask mode, or Codex `--sandbox read-only`. | `reviewers.ponytail.runner`: `claude` (default), `cursor`, or `codex`, overridden by `PENEIRA_RUNNER`. That CLI, and the skill at `.agents/skills/ponytail-review/SKILL.md` (`init --with-ponytail`; `.claude/skills/...` and the Claude plugin still count) |
 | `llm` | Independent model that judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set). `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) |
 | `sarif` | Any tool that emits SARIF: semgrep, CodeQL, eslint... `command` may use `{base}` and `{head}`; `requires` names a binary that must exist; `output` reads a file instead of stdout. | the tool |
 
-Use a different model family for `llm` than the one writing the code (ponytail runs on Claude),
-so the reviewers do not share blind spots.
+Use a different model family for `llm` than the one writing the code, so the reviewers do not
+share blind spots. Ponytail's model is `reviewers.ponytail.model` or `PONYTAIL_MODEL`.
 
 ## CI
 
@@ -136,9 +137,20 @@ so the reviewers do not share blind spots.
 | `ci-checks.yml` | lint, typecheck, tests, gitleaks, npm audit | yes |
 | `peneira-metrics.yml` | weekly metrics, optional Slack | no |
 
-Secrets: `ANTHROPIC_API_KEY` (ponytail), `REVIEW_API_KEY` (llm), `LINEAR_API_KEY` (optional),
-`REVIEW_METRICS_SLACK_WEBHOOK` (optional). Variables: `REVIEW_PROVIDER`, `REVIEW_MODEL`,
-`PONYTAIL_MODEL`.
+`peneira init --runner claude|cursor|codex` (default `claude`) writes `reviewers.ponytail.runner`
+and a workflow that installs only that CLI. The action input `agent-runner` is `claude`,
+`cursor`, `codex`, or `none`. `install-claude-code: true` still means Claude, so workflows
+generated before `agent-runner` keep working.
+
+| Runner | CI install | Secret |
+|---|---|---|
+| `claude` | `npm install -g @anthropic-ai/claude-code` | `ANTHROPIC_API_KEY` |
+| `cursor` | `curl https://cursor.com/install -fsS \| bash` | `CURSOR_API_KEY` |
+| `codex` | `npm install -g @openai/codex` | `CODEX_API_KEY` |
+
+Secrets: the runner secret above (Codex reads `CODEX_API_KEY`), `REVIEW_API_KEY` (llm),
+`LINEAR_API_KEY` (optional), `REVIEW_METRICS_SLACK_WEBHOOK` (optional). Variables:
+`REVIEW_PROVIDER`, `REVIEW_MODEL`, `PONYTAIL_MODEL`.
 
 The workflows use `leofmds/peneira@v0`. Pin it to a release tag or a commit SHA, and while the
 repo is private, allow other repos to use its action in *Settings → Actions → General → Access*.
@@ -179,7 +191,7 @@ reports things the team does not care about.
 ## Development
 
 ```bash
-npm test        # node:test, fixture repos, fake GitHub, fake Claude; no network
+npm test        # node:test, fixture repos, fake GitHub, fake runner CLIs; no network
 ```
 
 Layout: `src/commands/*` (CLI commands), `src/reviewers/*` (adapters), `src/policy.mjs` (gate),

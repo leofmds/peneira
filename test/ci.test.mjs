@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { main } from '../src/cli.mjs';
@@ -57,7 +57,10 @@ test('ci reviewers: a failing reviewer is reported, not fatal', async () => {
   withSkill(repo.cwd);
   const gh = fakeGitHub({ baseSha: repo.baseSha, headSha: repo.headSha });
   const io = scriptedIO([]);
-  const code = await main(['ci', 'reviewers'], { io, env: ciEnv(gh, { CLAUDE_BIN: '/nonexistent/claude' }), cwd: repo.cwd, fetchImpl: gh.fetchImpl });
+  const bin = join(mkdtempSync(join(tmpdir(), 'rg-fail-')), 'claude');
+  writeFileSync(bin, '#!/bin/sh\nexit 1\n');
+  chmodSync(bin, 0o755);
+  const code = await main(['ci', 'reviewers'], { io, env: ciEnv(gh, { CLAUDE_BIN: bin }), cwd: repo.cwd, fetchImpl: gh.fetchImpl });
   assert.equal(code, 0);
   assert.ok(io.log.some((l) => l.startsWith('::warning::ponytail failed')));
   assert.ok(gh.state.comments.some((c) => c.body.includes('Review failed to run')));

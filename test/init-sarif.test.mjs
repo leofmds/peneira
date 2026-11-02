@@ -19,28 +19,56 @@ test('init: data-pipeline preset, ponytail vendored at the pinned commit, workfl
   const code = await main(['init', '--preset', 'data-pipeline', '--with-ponytail', '--action-ref', 'acme/peneira@v0'],
     { io, cwd, env: {}, fetchImpl: async (u) => { urls.push(String(u)); return fakeRaw(u); } });
   assert.equal(code, 0, io.log.join('\n'));
-  for (const f of ['.peneira/config.json', 'CLAUDE.md', '.github/pull_request_template.md', '.claude/commands/pr-review.md',
-    '.claude/skills/ponytail-review/SKILL.md', '.claude/skills/ponytail-review/LICENSE', '.github/workflows/peneira-reviewers.yml']) {
+  for (const f of ['.peneira/config.json', 'AGENTS.md', 'CLAUDE.md', '.github/pull_request_template.md',
+    '.agents/workflows/pr-review.md', '.agents/workflows/pre-pr.md', '.claude/commands/pr-review.md',
+    '.agents/skills/ponytail-review/SKILL.md', '.agents/skills/ponytail-review/LICENSE', '.github/workflows/peneira-reviewers.yml']) {
     assert.ok(existsSync(join(cwd, f)), f);
   }
+  assert.equal(existsSync(join(cwd, '.claude/skills/ponytail-review/SKILL.md')), false);
   assert.ok(urls.every((u) => u.includes('/DietrichGebert/ponytail/96608e078b2d5ea607c5c3b8b5a54d1c1fba6846/')));
   const wf = readFileSync(join(cwd, '.github/workflows/peneira-reviewers.yml'), 'utf8');
   assert.match(wf, /uses: acme\/peneira@v0/);
   assert.match(wf, /install-python-tools: 'semgrep'/);
+  assert.match(wf, /agent-runner: 'claude'/);
+  assert.match(wf, /ANTHROPIC_API_KEY: \$\{\{ secrets\.ANTHROPIC_API_KEY \}\}/);
   assert.doesNotMatch(wf, /__/);
+  const raw = JSON.parse(readFileSync(join(cwd, '.peneira/config.json'), 'utf8'));
+  assert.equal(raw.reviewers.ponytail.runner, 'claude');
   const cfg = loadConfig(cwd);
   assert.equal(cfg.reviewers.semgrep.type, 'sarif');
   assert.ok(cfg.risk.paths.includes('**/ingestion/**'));
   assert.equal(cfg.budget.maxLogicLines, 400, 'defaults still apply');
-  assert.match(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8'), /Idempotency/);
+  assert.match(readFileSync(join(cwd, 'AGENTS.md'), 'utf8'), /Idempotency/);
+  assert.equal(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8'), '@AGENTS.md\n');
+  assert.match(readFileSync(join(cwd, '.agents/workflows/pre-pr.md'), 'utf8'), /AGENTS\.md/);
+  assert.doesNotMatch(readFileSync(join(cwd, '.agents/workflows/pre-pr.md'), 'utf8'), /CLAUDE\.md/);
+  assert.match(readFileSync(join(cwd, '.claude/commands/pr-review.md'), 'utf8'), /\.agents\/workflows\/pr-review\.md/);
 });
 
-test('init: never clobbers; existing CLAUDE.md gets a side file', async () => {
+test('init --runner writes that runner and only its secret', async () => {
+  for (const [runner, secret] of [['cursor', 'CURSOR_API_KEY'], ['codex', 'CODEX_API_KEY']]) {
+    const cwd = emptyRepo();
+    const code = await main(['init', '--runner', runner], { io: scriptedIO([]), cwd, env: {} });
+    assert.equal(code, 0);
+    const raw = JSON.parse(readFileSync(join(cwd, '.peneira/config.json'), 'utf8'));
+    assert.equal(raw.reviewers.ponytail.runner, runner);
+    const wf = readFileSync(join(cwd, '.github/workflows/peneira-reviewers.yml'), 'utf8');
+    assert.match(wf, new RegExp(`agent-runner: '${runner}'`));
+    assert.match(wf, new RegExp(`${secret}: \\$\\{\\{ secrets\\.${secret} \\}\\}`));
+    assert.doesNotMatch(wf, /ANTHROPIC_API_KEY/);
+    assert.doesNotMatch(wf, /install-claude-code/);
+  }
+});
+
+test('init: never clobbers; existing AGENTS.md and CLAUDE.md get side files', async () => {
   const cwd = emptyRepo();
   writeFileSync(join(cwd, 'CLAUDE.md'), 'mine');
+  writeFileSync(join(cwd, 'AGENTS.md'), 'ours');
   await main(['init'], { io: scriptedIO([]), cwd, env: {} });
   assert.equal(readFileSync(join(cwd, 'CLAUDE.md'), 'utf8'), 'mine');
-  assert.ok(existsSync(join(cwd, '.peneira/CLAUDE.peneira.md')));
+  assert.equal(readFileSync(join(cwd, 'AGENTS.md'), 'utf8'), 'ours');
+  assert.equal(readFileSync(join(cwd, '.peneira/CLAUDE.peneira.md'), 'utf8'), '@AGENTS.md\n');
+  assert.match(readFileSync(join(cwd, '.peneira/AGENTS.peneira.md'), 'utf8'), /Work from a spec/);
   writeFileSync(join(cwd, '.peneira/config.json'), '{"budget":{"maxFiles":1}}');
   const io = scriptedIO([]);
   await main(['init'], { io, cwd, env: {} });

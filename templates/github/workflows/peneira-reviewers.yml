@@ -29,10 +29,10 @@ jobs:
       - uses: __ACTION_REF__
         with:
           step: reviewers
-          install-claude-code: 'true'
+          agent-runner: '__AGENT_RUNNER__'
           install-python-tools: '__PY_TOOLS__'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          __PONYTAIL_AUTH__
           PONYTAIL_MODEL: ${{ vars.PONYTAIL_MODEL }}
           REVIEW_API_KEY: ${{ secrets.REVIEW_API_KEY }}
           REVIEW_PROVIDER: ${{ vars.REVIEW_PROVIDER }}
