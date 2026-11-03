@@ -53,14 +53,18 @@ peneira 14            # or just `peneira` on the PR's branch
 ## What `peneira <pr>` does
 
 1. **Resolves the PR**: `14`, `#14`, a PR URL, or nothing (the open PR of the current branch).
+
    Note: in bash, `peneira #14` treats `#14` as a comment and runs `peneira` with no argument,
-   which still works if you are on the PR's branch. Use `peneira 14` to be explicit.
+    which still works if you are on the PR's branch. Use `peneira 14` to be explicit.
 2. **Gate** (display only; CI owns labels and the guide comment): size budget counting only
+
    logic lines, linked ticket, required PR description sections, new dependencies, risk paths
-   and risky patterns in added lines. `--guide` prints the full reading order.
+    and risky patterns in added lines. `--guide` prints the full reading order.
 3. **Reviewers** run in parallel. Results already produced by CI for the same head commit are
+
    reused; local results are cached per commit in `.git/peneira/`. `--fresh` forces a re-run.
 4. **Triage**, Must fix first, all reviewers in one queue. Findings you triaged before are not
+
    asked again (`--all` to see them).
 5. **Publish** one GitHub review, pending by default.
 6. **Remember** your decisions in a small PR comment (visible part: counts only).
@@ -108,9 +112,9 @@ only gets what has no place in the code.
 `CLAUDE.md` is a one-line `@AGENTS.md` import. Two slash commands point at those checklists:
 
 - `/pr-review 14`: Claude runs `peneira 14 --list --json`, walks you through each finding one at a
-  time, asks for your decision, and posts with `--decide`. It never decides for you.
+time, asks for your decision, and posts with `--decide`. It never decides for you.
 - `/pre-pr`: the author-side checklist, including running ponytail-review and fixing every
-  Must fix before opening the PR.
+Must fix before opening the PR.
 
 ## Reviewers
 
@@ -186,7 +190,7 @@ reports things the team does not care about.
 ## Security model
 
 - PR titles, descriptions and diffs are untrusted. Reviewers only read; the llm prompt tells the
-  model to ignore instructions inside them; ponytail runs with read-only tools.
+model to ignore instructions inside them; ponytail runs with read-only tools.
 - Nothing reaches the PR as a review comment without a human decision.
 - Tokens are read from the environment or `gh`; peneira never stores them.
 
