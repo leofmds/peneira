@@ -47,7 +47,7 @@ export const DEFAULTS = {
   reviewers: {
     ponytail: { type: 'ponytail', enabled: true, prefix: 'P', runFor: 'all', maxTurns: 40, model: null, runner: 'claude' },
     llm: {
-      type: 'llm', enabled: true, prefix: 'A', runFor: 'ai-or-risk',
+      type: 'llm', enabled: true, prefix: 'A', runFor: 'all',
       provider: 'anthropic', model: null, apiKeyEnv: 'REVIEW_API_KEY', maxDiffChars: 120000, focus: null,
       transport: 'auto',
     },

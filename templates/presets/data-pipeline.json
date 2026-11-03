@@ -19,7 +19,7 @@
     "ponytail": { "enabled": true, "runFor": "all" },
     "llm": {
       "enabled": true,
-      "runFor": "ai-or-risk",
+      "runFor": "all",
       "provider": "openai",
       "model": null,
       "focus": "Backend / data infrastructure: Node.js, ingestion pipelines, ClickHouse, Snowflake, Postgres, third-party integrations. Pay special attention to idempotency and duplicate events, retries and timeouts, partial failure mid-batch, ordering assumptions, null / missing / oversized inputs, multi-tenant isolation, schema migrations and backfills, authorization at resource boundaries, secrets handling, and unbounded queries or memory."

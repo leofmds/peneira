@@ -2,7 +2,7 @@
   "ticket": { "urlTemplate": null },
   "reviewers": {
     "ponytail": { "enabled": true, "runFor": "all" },
-    "llm": { "enabled": true, "runFor": "ai-or-risk", "provider": "openai", "model": null }
+    "llm": { "enabled": true, "runFor": "all", "provider": "openai", "model": null }
   },
   "triage": { "linearTeamKey": null }
 }
