@@ -119,7 +119,7 @@ Must fix before opening the PR.
 ## Reviewers
 
 Configured in `.peneira/config.json` under `reviewers`. Each has `enabled`, `prefix` (finding
-ids), and `runFor`: `all`, `ai` (AI-generated PRs), `ai-or-risk`.
+ids), and `runFor`: `all` (the default, unless `.peneira/config.json` sets it), `ai` (AI-generated PRs), `ai-or-risk`.
 
 | Type | What it is | Needs |
 |---|---|---|
