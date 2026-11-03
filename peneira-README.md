@@ -63,7 +63,7 @@ peneira 14            # or just `peneira` on the PR's branch
 4. **Triage**, Must fix first, all reviewers in one queue. Findings you triaged before are not
    asked again (`--all` to see them).
 5. **Publish** one GitHub review, pending by default.
-6. **Remember** your decisions in a small PR comment (visible part: counts only).
+6. **Remember** your decisions in a hidden PR comment, so the next run skips findings you already triaged.
 
 ### Where each comment goes
 

@@ -9,7 +9,7 @@ import { createGitHub, parseRepoFromRemote, resolveToken } from '../github.mjs';
 import { ensureCommits, mergeBase, resolvePr } from '../pr.mjs';
 import { runPolicy, renderGuide } from '../policy.mjs';
 import { plannedReviewers, runReviewer } from '../reviewers/index.mjs';
-import { readStore, MARKERS, withData } from '../store.mjs';
+import { readStore, MARKERS, encodeData } from '../store.mjs';
 import { sortFindings, location, GROUP_LABEL } from '../findings.mjs';
 import { diffIndex } from '../diffindex.mjs';
 import { triageInteractive, parseDecisionSpec, applyDecisionSpec } from '../triage.mjs';
@@ -172,7 +172,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
     }
   }
 
-  // 7. Remember decisions (hidden data; the visible line shows counts only)
+  // 7. Remember decisions in a sticky comment. Both lines are HTML comments, so the PR shows nothing.
   const decisions = { ...previous };
   for (const ch of choices) {
     const f = ch.finding;
@@ -180,9 +180,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
       ...(ch.reason ? { reason: ch.reason } : {}), ...(ch.ticket ? { ticket: ch.ticket } : {}), at: new Date().toISOString() };
   }
   if (choices.length && !o.dryRun) {
-    const counts = Object.values(decisions).reduce((t, d) => ((t[d.decision] = (t[d.decision] || 0) + 1), t), {});
-    const md = `**Review triage by @${me}**: ${Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(', ')}`;
-    await gh.upsertSticky(pr.number, MARKERS.triage(me), withData(md, { reviewer: me, decisions }), comments);
+    await gh.upsertSticky(pr.number, MARKERS.triage(me), encodeData({ reviewer: me, decisions }), comments);
   }
   return 0;
 }
