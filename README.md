@@ -120,11 +120,12 @@ ids), and `runFor`: `all`, `ai` (AI-generated PRs), `ai-or-risk`.
 | Type | What it is | Needs |
 |---|---|---|
 | `ponytail` | The [ponytail-review](https://github.com/DietrichGebert/ponytail) skill (MIT), run headless through Claude Code, the Cursor agent CLI, or Codex. Reads callers, tests and expected load, not only the diff. Read-only: Claude's tool allowlist, Cursor ask mode, or Codex `--sandbox read-only`. | `reviewers.ponytail.runner`: `claude` (default), `cursor`, or `codex`, overridden by `PENEIRA_RUNNER`. That CLI, and the skill at `.agents/skills/ponytail-review/SKILL.md` (`init --with-ponytail`; `.claude/skills/...` and the Claude plugin still count) |
-| `llm` | Independent model that judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set). `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) |
+| `llm` | Independent model that judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set). `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. `transport` defaults to `auto`: the HTTP API when `REVIEW_API_KEY` is set, otherwise the ponytail runner's logged-in CLI. GitHub Actions without that key still skips. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) for HTTP. `REVIEW_TRANSPORT` (`auto`, `api`, `agent`) overrides `transport`. |
 | `sarif` | Any tool that emits SARIF: semgrep, CodeQL, eslint... `command` may use `{base}` and `{head}`; `requires` names a binary that must exist; `output` reads a file instead of stdout. | the tool |
 
 Use a different model family for `llm` than the one writing the code, so the reviewers do not
-share blind spots. Ponytail's model is `reviewers.ponytail.model` or `PONYTAIL_MODEL`.
+share blind spots. Ponytail's model is `reviewers.ponytail.model` or `PONYTAIL_MODEL`. On the
+agent transport, `reviewers.llm.model` or `REVIEW_MODEL` is passed as `--model` when set.
 
 ## CI
 
@@ -148,9 +149,10 @@ generated before `agent-runner` keep working.
 | `cursor` | `curl https://cursor.com/install -fsS \| bash` | `CURSOR_API_KEY` |
 | `codex` | `npm install -g @openai/codex` | `CODEX_API_KEY` |
 
-Secrets: the runner secret above (Codex reads `CODEX_API_KEY`), `REVIEW_API_KEY` (llm),
-`LINEAR_API_KEY` (optional), `REVIEW_METRICS_SLACK_WEBHOOK` (optional). Variables:
-`REVIEW_PROVIDER`, `REVIEW_MODEL`, `PONYTAIL_MODEL`.
+Secrets: the runner secret above (Codex reads `CODEX_API_KEY`), `REVIEW_API_KEY` (llm in CI;
+locally the runner login is used when the key is unset), `LINEAR_API_KEY` (optional),
+`REVIEW_METRICS_SLACK_WEBHOOK` (optional). Variables: `REVIEW_PROVIDER`, `REVIEW_MODEL`,
+`REVIEW_TRANSPORT`, `PONYTAIL_MODEL`.
 
 The workflows use `leofmds/peneira@v0`. Pin it to a release tag or a commit SHA, and while the
 repo is private, allow other repos to use its action in *Settings → Actions → General → Access*.

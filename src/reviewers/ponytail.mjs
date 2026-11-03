@@ -32,14 +32,14 @@ function skillSource(cwd) {
   return null;
 }
 
-function resolveRunner(conf = {}, env = process.env) {
+export function resolveRunner(conf = {}, env = process.env) {
   const name = env.PENEIRA_RUNNER || conf.runner || 'claude';
   const spec = RUNNERS[name];
-  if (!spec) throw new Error(`Unknown ponytail runner "${name}" (claude, cursor, codex)`);
+  if (!spec) throw new Error(`Unknown runner "${name}" (claude, cursor, codex)`);
   return { name, spec, bin: env[spec.binEnv] || spec.bin };
 }
 
-function binaryExists(bin, env) {
+export function binaryExists(bin, env) {
   if (bin.includes('/')) return existsSync(bin);
   return spawnSync('sh', ['-c', `command -v ${JSON.stringify(bin)}`], { env, stdio: 'ignore' }).status === 0;
 }
@@ -112,7 +112,7 @@ function argsFor(name, { prompt, conf, cwd, model, outFile }) {
   return args;
 }
 
-function capture(bin, args, { cwd, env, label }) {
+export function capture(bin, args, { cwd, env, label }) {
   return new Promise((resolve, reject) => {
     const p = spawn(bin, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '';

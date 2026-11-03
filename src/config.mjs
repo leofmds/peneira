@@ -49,6 +49,7 @@ export const DEFAULTS = {
     llm: {
       type: 'llm', enabled: true, prefix: 'A', runFor: 'ai-or-risk',
       provider: 'anthropic', model: null, apiKeyEnv: 'REVIEW_API_KEY', maxDiffChars: 120000, focus: null,
+      transport: 'auto',
     },
   },
   triage: { linearTeamKey: null },

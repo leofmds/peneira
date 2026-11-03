@@ -1,7 +1,12 @@
-// Adapter: an independent LLM reviewer (Anthropic or OpenAI) that judges the diff against
-// the ticket. Use a different model/provider from the one that wrote the code.
+// Adapter: an independent LLM reviewer that judges the diff against the ticket.
+// Use a different model/provider from the one that wrote the code.
+// transport auto: HTTP when the review key is set, otherwise the logged-in runner CLI.
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { git } from '../git.mjs';
 import { makeFinding } from '../findings.mjs';
+import { binaryExists, capture, resolveRunner } from './ponytail.mjs';
 
 const BASE_PROMPT = `You are a principal engineer reviewing a pull request that was likely written by an AI coding agent.
 AI-generated code usually compiles, is well-formatted and passes its own tests, while being
@@ -26,12 +31,37 @@ Rules:
   "questions_for_author": [ string ]
 }`;
 
-export function available({ conf, env = process.env }) {
-  const key = env[conf.apiKeyEnv || 'REVIEW_API_KEY'];
+const keyEnv = (conf) => conf.apiKeyEnv || 'REVIEW_API_KEY';
+const keyReason = (conf) => `set ${keyEnv(conf)} to enable this reviewer`;
+
+export function resolveTransport(conf = {}, env = process.env) {
+  const t = env.REVIEW_TRANSPORT || conf.transport || 'auto';
+  if (t === 'api' || t === 'agent') return t;
+  if (t !== 'auto') throw new Error(`Unknown transport "${t}" (auto, api, agent)`);
+  if (env[keyEnv(conf)] || env.GITHUB_ACTIONS) return 'api';
+  return 'agent';
+}
+
+function apiAvailable(conf, env) {
   const model = env.REVIEW_MODEL || conf.model;
-  if (!key) return { ok: false, reason: `set ${conf.apiKeyEnv || 'REVIEW_API_KEY'} to enable this reviewer` };
+  if (!env[keyEnv(conf)]) return { ok: false, reason: keyReason(conf) };
   if (!model) return { ok: false, reason: 'set reviewers.<name>.model in .peneira/config.json or REVIEW_MODEL' };
   return { ok: true };
+}
+
+function agentAvailable(conf, cfg, env) {
+  let runner;
+  try { runner = resolveRunner({ runner: conf.runner || cfg?.reviewers?.ponytail?.runner }, env); }
+  catch (e) { return { ok: false, reason: e.message }; }
+  if (!binaryExists(runner.bin, env)) return { ok: false, reason: `${runner.spec.label} is not installed` };
+  return { ok: true };
+}
+
+export function available({ conf = {}, cfg, env = process.env }) {
+  let transport;
+  try { transport = resolveTransport(conf, env); }
+  catch (e) { return { ok: false, reason: e.message }; }
+  return transport === 'api' ? apiAvailable(conf, env) : agentAvailable(conf, cfg, env);
 }
 
 async function fetchTicket(id, env, fetchImpl) {
@@ -72,6 +102,60 @@ async function call({ provider, model, key, system, user, fetchImpl }) {
   throw new Error(`Unknown provider "${provider}"`);
 }
 
+function agentArgs(name, { system, user, cwd, model, outFile }) {
+  if (name === 'claude') {
+    const args = [
+      '-p', user,
+      '--system-prompt', system,
+      '--tools', '',
+      '--disallowedTools', 'mcp__*',
+      '--max-turns', '1',
+      '--output-format', 'json',
+    ];
+    if (model) args.push('--model', model);
+    return args;
+  }
+  // ponytail: Cursor ask mode and the Codex read-only sandbox can still read the repo. Ceiling: the prompt already contains the diff. Upgrade: an ACP client that denies every tool call.
+  const prompt = `${system}\n\n${user}`;
+  if (name === 'cursor') {
+    const args = ['-p', '--mode', 'ask', '--trust', '--output-format', 'json', '--workspace', cwd];
+    if (model) args.push('--model', model);
+    args.push(prompt);
+    return args;
+  }
+  const args = ['exec', '--sandbox', 'read-only', '--ephemeral', '-C', cwd, '-o', outFile];
+  if (model) args.push('--model', model);
+  args.push(prompt);
+  return args;
+}
+
+async function callAgent({ conf, cfg, cwd, env, system, user, model }) {
+  const runner = resolveRunner({ runner: conf.runner || cfg?.reviewers?.ponytail?.runner }, env);
+  let dir = null;
+  let outFile = null;
+  if (runner.name === 'codex') {
+    dir = mkdtempSync(join(tmpdir(), 'peneira-llm-'));
+    outFile = join(dir, 'last.txt');
+  }
+  try {
+    const stdout = await capture(
+      runner.bin,
+      agentArgs(runner.name, { system, user, cwd, model, outFile }),
+      { cwd, env, label: runner.spec.label },
+    );
+    let text = stdout;
+    if (outFile) {
+      if (!existsSync(outFile)) throw new Error('Codex wrote no final message');
+      text = readFileSync(outFile, 'utf8');
+    } else {
+      try { text = JSON.parse(stdout).result ?? stdout; } catch { /* plain text */ }
+    }
+    return { text, runner: runner.name };
+  } finally {
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 export function normalize(result, { prefix, source }) {
   const toGroup = { critical: 'must', major: 'should', minor: 'nice' };
   const findings = [];
@@ -94,10 +178,11 @@ export function normalize(result, { prefix, source }) {
   return findings;
 }
 
-export async function run({ name, conf, cwd, base, head, pr, report, env = process.env, fetchImpl = globalThis.fetch }) {
+export async function run({ name, conf, cfg, cwd, base, head, pr, report, env = process.env, fetchImpl = globalThis.fetch }) {
+  const transport = resolveTransport(conf, env);
   const provider = env.REVIEW_PROVIDER || conf.provider || 'anthropic';
   const model = env.REVIEW_MODEL || conf.model;
-  const key = env[conf.apiKeyEnv || 'REVIEW_API_KEY'];
+  const key = env[keyEnv(conf)];
   const issue = await fetchTicket(report?.ticket, env, fetchImpl);
 
   let diff = '';
@@ -117,12 +202,20 @@ export async function run({ name, conf, cwd, base, head, pr, report, env = proce
     `## Files (reading order)\n${(report?.readingOrder || []).map((f) => `${f.path} [${f.category}${f.risky ? ', RISK' : ''}]`).join('; ')}\n\n` +
     `## DIFF\n${diff}`;
 
-  const text = await call({ provider, model, key, system, user, fetchImpl });
+  let text;
+  let via = `${provider} / ${model}`;
+  if (transport === 'agent') {
+    const agent = await callAgent({ conf, cfg, cwd, env, system, user, model });
+    text = agent.text;
+    via = `${agent.runner} / ${model || 'default'}`;
+  } else {
+    text = await call({ provider, model, key, system, user, fetchImpl });
+  }
   const clean = text.replace(/```json|```/g, '').trim();
   const result = JSON.parse(clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1));
   const icon = { matches: '🟢', partial: '🟡', mismatch: '🔴', no_spec: '⚪' };
   return {
-    title: `🤖 ${name} (${provider} / ${model})`,
+    title: `🤖 ${name} (${via})`,
     intro: `**Intent vs spec:** ${icon[result.intent_match?.status] || '⚪'} ${result.intent_match?.status || 'unknown'}`,
     findings: normalize(result, { prefix: conf.prefix || 'A', source: name }),
     meta: { intent: result.intent_match, assumptions: result.unstated_assumptions, questions: result.questions_for_author },

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { main } from '../src/cli.mjs';
 import { makeFinding } from '../src/findings.mjs';
 import * as ponytail from '../src/reviewers/ponytail.mjs';
+import * as llm from '../src/reviewers/llm.mjs';
 import { MARKERS, withData, readStore } from '../src/store.mjs';
 import { fixtureRepo, fakeGitHub, fakeClaude, withSkill, scriptedIO, PONYTAIL_FINDINGS } from './helpers.mjs';
 
@@ -189,4 +190,79 @@ else process.stdout.write(JSON.stringify({ result: text }));
   const overridden = JSON.parse(readFileSync(log, 'utf8'));
   assert.equal(overridden[overridden.indexOf('--mode') + 1], 'ask');
   assert.equal(ponytail.available({ cwd, conf: { runner: 'claude' }, env: { CLAUDE_BIN: '/nonexistent/claude', PATH: process.env.PATH } }).ok, false);
+});
+
+test('llm agent transport: login locally, HTTP when the key or CI is present', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'rg-llm-'));
+  const log = join(cwd, 'argv.json');
+  const bin = join(cwd, 'fake-agent');
+  const payload = JSON.stringify(LLM_RESULT);
+  writeFileSync(bin, `#!/usr/bin/env node
+const fs = require('fs');
+const argv = process.argv.slice(2);
+fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify(argv));
+const text = ${JSON.stringify(payload)};
+const o = argv.indexOf('-o');
+if (o >= 0) fs.writeFileSync(argv[o + 1], text);
+else process.stdout.write(JSON.stringify({ result: text }));
+`);
+  chmodSync(bin, 0o755);
+  const bins = { claude: 'CLAUDE_BIN', cursor: 'CURSOR_AGENT_BIN', codex: 'CODEX_BIN' };
+  const ctx = { name: 'llm', cwd, base: 'a', head: 'b', pr: { title: 'PLAT-482', body: '' }, report: { readingOrder: [] } };
+  let fetches = 0;
+  const fetchImpl = async () => { fetches += 1; throw new Error('http'); };
+
+  for (const runner of ['claude', 'cursor', 'codex']) {
+    fetches = 0;
+    const result = await llm.run({
+      ...ctx, conf: { runner, prefix: 'A', transport: 'auto' }, fetchImpl,
+      env: { [bins[runner]]: bin, PATH: process.env.PATH },
+    });
+    const argv = JSON.parse(readFileSync(log, 'utf8'));
+    assert.equal(fetches, 0);
+    assert.equal(result.findings[0].id, 'A1');
+    assert.equal(result.findings.length, 2);
+    assert.match(result.title, new RegExp(`${runner} / default`));
+    assert.equal(argv.includes('--model'), false);
+    if (runner === 'claude') {
+      assert.equal(argv[argv.indexOf('--tools') + 1], '');
+      assert.equal(argv[argv.indexOf('--max-turns') + 1], '1');
+      assert.match(argv[argv.indexOf('--system-prompt') + 1], /principal engineer/);
+      assert.equal(argv.includes('--bare'), false);
+      assert.equal(argv.includes('--allowedTools'), false);
+      assert.match(argv[argv.indexOf('-p') + 1], /## DIFF/);
+    } else if (runner === 'cursor') {
+      assert.equal(argv[argv.indexOf('--mode') + 1], 'ask');
+      assert.match(argv.at(-1), /## DIFF/);
+    } else {
+      assert.equal(argv[argv.indexOf('--sandbox') + 1], 'read-only');
+      assert.equal(existsSync(argv[argv.indexOf('-o') + 1]), false);
+      assert.match(argv.at(-1), /## DIFF/);
+    }
+  }
+
+  await llm.run({
+    ...ctx, conf: { runner: 'claude', prefix: 'A' }, fetchImpl,
+    env: { PENEIRA_RUNNER: 'cursor', REVIEW_MODEL: 'other-model', CURSOR_AGENT_BIN: bin, PATH: process.env.PATH },
+  });
+  const overridden = JSON.parse(readFileSync(log, 'utf8'));
+  assert.equal(overridden[overridden.indexOf('--mode') + 1], 'ask');
+  assert.equal(overridden[overridden.indexOf('--model') + 1], 'other-model');
+
+  await llm.run({
+    ...ctx, conf: { prefix: 'A' }, cfg: { reviewers: { ponytail: { runner: 'codex' } } }, fetchImpl,
+    env: { CODEX_BIN: bin, PATH: process.env.PATH },
+  });
+  const fromPonytail = JSON.parse(readFileSync(log, 'utf8'));
+  assert.equal(fromPonytail[fromPonytail.indexOf('--sandbox') + 1], 'read-only');
+
+  const missing = { CLAUDE_BIN: '/nonexistent/claude', PATH: process.env.PATH };
+  const present = { CLAUDE_BIN: bin, PATH: process.env.PATH };
+  assert.equal(llm.available({ conf: { transport: 'auto' }, env: { ...present, GITHUB_ACTIONS: 'true' } }).ok, false);
+  assert.match(llm.available({ conf: { transport: 'auto' }, env: { ...present, GITHUB_ACTIONS: 'true' } }).reason, /REVIEW_API_KEY/);
+  assert.equal(llm.available({ conf: { transport: 'api' }, env: present }).ok, false);
+  assert.equal(llm.available({ conf: { transport: 'agent' }, env: { ...missing, REVIEW_API_KEY: 'k' } }).ok, false);
+  assert.equal(llm.available({ conf: { transport: 'api', model: 'm' }, env: { ...present, REVIEW_API_KEY: 'k' } }).ok, true);
+  assert.equal(llm.available({ conf: { transport: 'nope' }, env: present }).ok, false);
+  assert.match(llm.available({ conf: { runner: 'nope', transport: 'agent' }, env: present }).reason, /Unknown runner/);
 });

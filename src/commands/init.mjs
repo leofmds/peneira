@@ -109,7 +109,7 @@ export async function runInit({ argv = [], cwd, env, io, fetchImpl = globalThis.
   for (const f of skipped) io.print(`  ${c.dim('=')} ${f} ${c.dim('(exists; --force to overwrite)')}`);
   io.print(`\nNext steps:
   1. Review ${CONFIG_PATH} (risk paths, ticket URL, reviewer models).
-  2. Add secrets: ${secret}, REVIEW_API_KEY, LINEAR_API_KEY (optional).
+  2. Add secrets: ${secret}, REVIEW_API_KEY (llm in CI), LINEAR_API_KEY (optional).
   3. Copy .github/CODEOWNERS.example to .github/CODEOWNERS and set the handles.${mergeNote}${o.ponytail ? '' : `\n  ${c.yellow('!')} ponytail-review is not vendored: run again with --with-ponytail, or install the ponytail plugin.`}
 Then: peneira <PR number>`);
   return 0;
