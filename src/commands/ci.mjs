@@ -57,10 +57,10 @@ export async function runCi({ argv, cwd, env, io, fetchImpl = globalThis.fetch }
     const footer = '<sub>Run `peneira ' + pr.number + '` in the repo to decide, finding by finding, what gets posted.</sub>';
     const md = renderBotComment({ title: res.title || res.name, intro: res.intro, findings: res.findings, footer, visibility });
     await gh.upsertSticky(pr.number, marker, withData(md, {
-      headSha: head, baseSha: base, title: res.title, intro: res.intro, findings: res.findings, meta: res.meta,
+      headSha: head, baseSha: base, title: res.title, intro: res.intro, findings: res.findings, meta: res.meta, skill: res.skill,
     }), comments);
     summary(env, renderBotComment({ title: res.title || res.name, intro: res.intro, findings: res.findings, visibility: 'full' }));
-    io.print(`${res.name}: ${res.findings.length} finding(s)`);
+    io.print(`${res.skill ? `${res.name} (${res.skill})` : res.name}: ${res.findings.length} finding(s)`);
   }
   return 0; // reviewers are advisory
 }

@@ -116,7 +116,8 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
     if (r.error) io.print(`${c.red('✖')} ${r.name}: failed (${r.error})`);
     else if (r.skipped) io.print(`${c.dim('–')} ${r.name}: skipped (${r.skipped})`);
     else {
-      io.print(`${c.green('✔')} ${r.name}: ${r.findings.length} finding(s) ${c.dim(`[${r.origin}]`)}`);
+      const who = r.skill ? `${r.name} (${r.skill})` : r.name;
+      io.print(`${c.green('✔')} ${who}: ${r.findings.length} finding(s) ${c.dim(`[${r.origin}]`)}`);
       if (r.suggest && r.origin === 'local') io.print(c.yellow(r.suggest));
     }
   }

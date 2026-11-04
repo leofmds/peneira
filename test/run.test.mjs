@@ -293,6 +293,7 @@ process.stdout.write(JSON.stringify({ result: ${JSON.stringify(payload)} }));
   assert.equal(result.findings[0].id, 'A1');
   assert.equal(result.suggest, null);
   assert.match(result.title, /code-review/);
+  assert.equal(result.skill, 'code-review');
   assert.equal(argv[argv.indexOf('--allowedTools') + 1].includes('Bash(git diff:*)'), true);
   assert.match(argv[argv.indexOf('-p') + 1], new RegExp(skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(argv[argv.indexOf('-p') + 1], /Do not post to GitHub/);

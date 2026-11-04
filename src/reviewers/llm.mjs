@@ -252,6 +252,7 @@ export async function run({ name, conf, cfg, cwd, base, head, pr, report, env = 
   const icon = { matches: '🟢', partial: '🟡', mismatch: '🔴', no_spec: '⚪' };
   return {
     title: `🤖 ${name} (${via})`,
+    skill: skill?.name || null,
     intro: `**Intent vs spec:** ${icon[result.intent_match?.status] || '⚪'} ${result.intent_match?.status || 'unknown'}`,
     findings: normalize(result, { prefix: conf.prefix || 'A', source: name }),
     meta: { intent: result.intent_match, assumptions: result.unstated_assumptions, questions: result.questions_for_author },
