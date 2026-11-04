@@ -46,7 +46,12 @@ export function resolveReviewSkill(names, cwd, env) {
 }
 
 export function installHint(names) {
-  const wanted = REVIEW_SKILLS.filter((s) => names?.includes(s.name));
-  if (!wanted.length) return null;
-  return `No review skill installed. Using the built-in prompt.\n${wanted.map((s) => `  ${s.install}`).join('\n')}`;
+  if (!names?.length) return null;
+  const lines = names.map((name) => {
+    const known = REVIEW_SKILLS.find((s) => s.name === name);
+    return known
+      ? `  ${known.install}`
+      : `  ${name}: SKILL.md at .agents/skills/${name}/SKILL.md (or .claude/skills, .cursor/skills; in the repo or under your home directory)`;
+  });
+  return `No review skill installed. Using the built-in prompt.\n${lines.join('\n')}`;
 }

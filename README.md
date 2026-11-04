@@ -9,7 +9,7 @@ peneira 14
 ```
 
 AI reviewers are good at finding problems and bad at knowing which ones matter. peneira
-runs the reviewers, holds their findings, and lets **you** decide finding by finding what the
+runs the reviewers, holds their findings, and lets you decide finding by finding what the
 author sees. Every posted comment is a human decision.
 
 ```
@@ -124,7 +124,7 @@ ids), and `runFor`: `all` (the default, unless `.peneira/config.json` sets it), 
 | Type | What it is | Needs |
 |---|---|---|
 | `ponytail` | The [ponytail-review](https://github.com/DietrichGebert/ponytail) skill (MIT), run headless through Claude Code, the Cursor agent CLI, or Codex. Reads callers, tests and expected load, not only the diff. Read-only: Claude's tool allowlist, Cursor ask mode, or Codex `--sandbox read-only`. | `reviewers.ponytail.runner`: `claude` (default), `cursor`, or `codex`, overridden by `PENEIRA_RUNNER`. That CLI, and the skill at `.agents/skills/ponytail-review/SKILL.md` (`init --with-ponytail`; `.claude/skills/...` and the Claude plugin still count) |
-| `llm` | A review skill when one is installed, otherwise an independent model that judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set). `skills` is the preference order; the first installed skill reviews, read-only, and does not post. With none installed, the built-in prompt runs and the CLI prints install commands. `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. `transport` defaults to `auto`: the HTTP API when `REVIEW_API_KEY` is set, otherwise the ponytail runner's logged-in CLI. GitHub Actions without that key still skips. | `~/.peneira/config.json` holds the default `skills` list (created on first run). `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) for the backup HTTP prompt. `REVIEW_TRANSPORT` (`auto`, `api`, `agent`) overrides `transport`. |
+| `llm` | The first installed skill in `reviewers.llm.skills` (see [Review skill](#review-skill)). It reviews read-only and does not post. With none installed, a built-in prompt judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set) and the CLI prints how to install the missing skills. `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. `transport` defaults to `auto`: the HTTP API when `REVIEW_API_KEY` is set, otherwise the ponytail runner's logged-in CLI. GitHub Actions without that key still skips. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) for the backup HTTP prompt. `REVIEW_TRANSPORT` (`auto`, `api`, `agent`) overrides `transport`. |
 | `sarif` | Any tool that emits SARIF: semgrep, CodeQL, eslint... `command` may use `{base}` and `{head}`; `requires` names a binary that must exist; `output` reads a file instead of stdout. | the tool |
 
 Use a different model family for `llm` than the one writing the code, so the reviewers do not
@@ -164,7 +164,12 @@ Fork PRs get no secrets, so reviewers skip in CI; run `peneira <pr>` locally ins
 
 ## Configuration
 
-`.peneira/config.json` is merged over the defaults (objects merge, arrays replace).
+Three layers, later wins. Objects merge, arrays replace.
+
+1. Product defaults.
+2. `~/.peneira/config.json`, created on the first `peneira` run. Yours, on every repo.
+3. `.peneira/config.json` in the repo. The team's override.
+
 Most-used keys:
 
 | Key | Default |
@@ -179,6 +184,24 @@ Most-used keys:
 
 Scopes for `blockingFor` / `requiredFor`: `all`, `ai`, `none`. Start with `none` for a week,
 then `ai`.
+
+## Review skill
+
+`reviewers.llm.skills` is the preference order. The first name whose `SKILL.md` exists is the reviewer. Peneira looks in `.agents/skills/<name>/`, `.claude/skills/<name>/`, and `.cursor/skills/<name>/`, in the repo first and then under your home directory.
+
+The default list is `code-review`, `requesting-code-review`, and `code-review-and-quality`. To use your own skill on every repo, set the list in `~/.peneira/config.json`:
+
+```json
+{ "reviewers": { "llm": { "skills": ["the-judge"] } } }
+```
+
+A repo replaces that list by setting `skills` in `.peneira/config.json`. Leaving `skills` out keeps the global list. `skills: []` turns the skill reviewer off and uses the built-in prompt.
+
+```json
+{ "reviewers": { "llm": { "skills": ["our-review"] } } }
+```
+
+`our-review` is the folder name, so the file is `.agents/skills/our-review/SKILL.md` (or the same path under `.claude/skills` or `.cursor/skills`). If none of the configured skills are installed, peneira says so, prints an install command for a known skill or the expected path for your own, and reviews with the built-in prompt.
 
 ## Metrics
 
@@ -206,7 +229,7 @@ module that talks to the platform), `templates/` (what `init` writes).
 
 ## Why the name
 
-In Guaxupé, Minas Gerais, coffee goes through machines first: harvesters, dryers, hullers.
+In the state of Minas Gerais, coffee goes through machines first: harvesters, dryers, hullers.
 Then it goes through the *peneira*, and finally through people who sort the beans by hand
 (*catação*) and taste the cup. Code review with AI works best the same way: let the machines
 do the volume, and keep the judgment human.

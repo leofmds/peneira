@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { parsePrRef } from '../src/pr.mjs';
 import { parseRepoFromRemote } from '../src/github.mjs';
 import { loadConfig, DEFAULTS, ensureUserConfig } from '../src/config.mjs';
-import { findSkill } from '../src/reviewers/skills.mjs';
+import { findSkill, installHint, resolveReviewSkill } from '../src/reviewers/skills.mjs';
 import { runPolicy } from '../src/policy.mjs';
 import { makeFinding, fromSarif, toSarif } from '../src/findings.mjs';
 import { readStore, MARKERS, withData } from '../src/store.mjs';
@@ -50,6 +50,15 @@ test('config: ~/.peneira/config.json sets the default skills, the repo file repl
   writeFileSync(skill, '---\nname: code-review\n---\n');
   assert.equal(findSkill('code-review', bare.cwd, {}), skill);
   assert.equal(findSkill('missing', bare.cwd, { HOME: home }), null);
+  const custom = join(bare.cwd, '.agents/skills/my-review/SKILL.md');
+  mkdirSync(join(custom, '..'), { recursive: true });
+  writeFileSync(custom, '---\nname: my-review\n---\n');
+  assert.equal(resolveReviewSkill(['the-judge', 'my-review'], bare.cwd, {}).path, custom);
+  const hint = installHint(['the-judge']);
+  assert.match(hint, /the-judge/);
+  assert.match(hint, /\.agents\/skills\/the-judge\/SKILL\.md/);
+  assert.match(installHint(['code-review']), /npx skills add mattpocock\/skills/);
+  assert.equal(installHint([]), null);
 });
 
 test('policy: classifies files, detects AI, blocks on unjustified dependency and empty sections', () => {
