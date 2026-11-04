@@ -266,3 +266,34 @@ else process.stdout.write(JSON.stringify({ result: text }));
   assert.equal(llm.available({ conf: { transport: 'nope' }, env: present }).ok, false);
   assert.match(llm.available({ conf: { runner: 'nope', transport: 'agent' }, env: present }).reason, /Unknown runner/);
 });
+
+test('llm uses the first installed review skill and does not post', async () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'rg-llm-skill-'));
+  mkdirSync(join(cwd, '.agents/skills/code-review'), { recursive: true });
+  const skill = join(cwd, '.agents/skills/code-review/SKILL.md');
+  writeFileSync(skill, '---\nname: code-review\n---\nReview.\n');
+  const log = join(cwd, 'argv.json');
+  const bin = join(cwd, 'fake-agent');
+  const payload = `Notes.\n\`\`\`json\n${JSON.stringify(LLM_RESULT)}\n\`\`\``;
+  writeFileSync(bin, `#!/usr/bin/env node
+const fs = require('fs');
+fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify(process.argv.slice(2)));
+process.stdout.write(JSON.stringify({ result: ${JSON.stringify(payload)} }));
+`);
+  chmodSync(bin, 0o755);
+  let fetches = 0;
+  const result = await llm.run({
+    name: 'llm', cwd, base: 'a', head: 'b', pr: { title: 't', body: '' }, report: { readingOrder: [] },
+    conf: { runner: 'claude', prefix: 'A', skills: ['code-review', 'requesting-code-review'], transport: 'auto' },
+    env: { CLAUDE_BIN: bin, REVIEW_API_KEY: 'k', PATH: process.env.PATH },
+    fetchImpl: async () => { fetches += 1; throw new Error('http'); },
+  });
+  const argv = JSON.parse(readFileSync(log, 'utf8'));
+  assert.equal(fetches, 0);
+  assert.equal(result.findings[0].id, 'A1');
+  assert.equal(result.suggest, null);
+  assert.match(result.title, /code-review/);
+  assert.equal(argv[argv.indexOf('--allowedTools') + 1].includes('Bash(git diff:*)'), true);
+  assert.match(argv[argv.indexOf('-p') + 1], new RegExp(skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(argv[argv.indexOf('-p') + 1], /Do not post to GitHub/);
+});

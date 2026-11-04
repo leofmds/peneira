@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { deepMerge } from './util.mjs';
+import { REVIEW_SKILL_NAMES } from './reviewers/skills.mjs';
 
 export const CONFIG_PATH = '.peneira/config.json';
 
@@ -49,19 +50,37 @@ export const DEFAULTS = {
     llm: {
       type: 'llm', enabled: true, prefix: 'A', runFor: 'all',
       provider: 'anthropic', model: null, apiKeyEnv: 'REVIEW_API_KEY', maxDiffChars: 120000, focus: null,
-      transport: 'auto',
+      transport: 'auto', skills: REVIEW_SKILL_NAMES,
     },
   },
   triage: { linearTeamKey: null },
 };
 
-export function loadConfig(cwd) {
-  const p = join(cwd, CONFIG_PATH);
-  if (!existsSync(p)) return structuredClone(DEFAULTS);
-  let user;
-  try { user = JSON.parse(readFileSync(p, 'utf8')); }
-  catch (e) { throw new Error(`${CONFIG_PATH} is not valid JSON: ${e.message}`); }
-  return deepMerge(DEFAULTS, user);
+export function userConfigPath(env = {}) {
+  return env.HOME ? join(env.HOME, '.peneira', 'config.json') : null;
+}
+
+function readJson(path, label) {
+  try { return JSON.parse(readFileSync(path, 'utf8')); }
+  catch (e) { throw new Error(`${label} is not valid JSON: ${e.message}`); }
+}
+
+/** Product defaults, then ~/.peneira/config.json, then the repo file. Later layers win. */
+export function loadConfig(cwd, env = {}) {
+  let cfg = structuredClone(DEFAULTS);
+  const user = userConfigPath(env);
+  if (user && existsSync(user)) cfg = deepMerge(cfg, readJson(user, user));
+  const repo = join(cwd, CONFIG_PATH);
+  if (existsSync(repo)) cfg = deepMerge(cfg, readJson(repo, CONFIG_PATH));
+  return cfg;
+}
+
+export function ensureUserConfig(env = {}) {
+  const p = userConfigPath(env);
+  if (!p || existsSync(p)) return p;
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, `${JSON.stringify({ reviewers: { llm: { skills: REVIEW_SKILL_NAMES } } }, null, 2)}\n`);
+  return p;
 }
 
 /** "all" | "ai" | "ai-or-risk" | "none" */

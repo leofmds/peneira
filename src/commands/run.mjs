@@ -3,7 +3,7 @@
 //   -> triage finding by finding -> one GitHub review + file comments -> save decisions
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadConfig } from '../config.mjs';
+import { ensureUserConfig, loadConfig } from '../config.mjs';
 import { gitDir, gitSafe } from '../git.mjs';
 import { createGitHub, parseRepoFromRemote, resolveToken } from '../github.mjs';
 import { ensureCommits, mergeBase, resolvePr } from '../pr.mjs';
@@ -72,7 +72,8 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   if (o.help) { io.print(RUN_HELP); return 0; }
   const c = io.color;
 
-  const cfg = loadConfig(cwd);
+  ensureUserConfig(env);
+  const cfg = loadConfig(cwd, env);
   const repo = o.repo || parseRepoFromRemote(gitSafe(cwd, 'remote', 'get-url', 'origin'));
   if (!repo) throw new Error('Could not infer the GitHub repo from the origin remote; pass --repo owner/name.');
   const gh = createGitHub({ token: resolveToken(env), repo, fetchImpl });
@@ -114,7 +115,10 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   for (const r of results) {
     if (r.error) io.print(`${c.red('✖')} ${r.name}: failed (${r.error})`);
     else if (r.skipped) io.print(`${c.dim('–')} ${r.name}: skipped (${r.skipped})`);
-    else io.print(`${c.green('✔')} ${r.name}: ${r.findings.length} finding(s) ${c.dim(`[${r.origin}]`)}`);
+    else {
+      io.print(`${c.green('✔')} ${r.name}: ${r.findings.length} finding(s) ${c.dim(`[${r.origin}]`)}`);
+      if (r.suggest && r.origin === 'local') io.print(c.yellow(r.suggest));
+    }
   }
 
   // 4. Queue

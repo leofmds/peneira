@@ -1,8 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { parsePrRef } from '../src/pr.mjs';
 import { parseRepoFromRemote } from '../src/github.mjs';
-import { loadConfig, DEFAULTS } from '../src/config.mjs';
+import { loadConfig, DEFAULTS, ensureUserConfig } from '../src/config.mjs';
+import { findSkill } from '../src/reviewers/skills.mjs';
 import { runPolicy } from '../src/policy.mjs';
 import { makeFinding, fromSarif, toSarif } from '../src/findings.mjs';
 import { readStore, MARKERS, withData } from '../src/store.mjs';
@@ -32,6 +36,20 @@ test('config: repo file overrides defaults, arrays replace', () => {
   assert.equal(cfg.budget.maxFiles, 3);
   assert.equal(cfg.budget.maxLogicLines, DEFAULTS.budget.maxLogicLines);
   assert.deepEqual(cfg.ignore, ['x']);
+});
+
+test('config: ~/.peneira/config.json sets the default skills, the repo file replaces them', () => {
+  const home = mkdtempSync(join(tmpdir(), 'rg-home-'));
+  ensureUserConfig({ HOME: home });
+  const bare = fixtureRepo();
+  assert.deepEqual(loadConfig(bare.cwd, { HOME: home }).reviewers.llm.skills, ['code-review', 'requesting-code-review', 'code-review-and-quality']);
+  const over = fixtureRepo({ config: { reviewers: { llm: { skills: ['only-repo'] } } } });
+  assert.deepEqual(loadConfig(over.cwd, { HOME: home }).reviewers.llm.skills, ['only-repo']);
+  const skill = join(bare.cwd, '.agents/skills/code-review/SKILL.md');
+  mkdirSync(join(skill, '..'), { recursive: true });
+  writeFileSync(skill, '---\nname: code-review\n---\n');
+  assert.equal(findSkill('code-review', bare.cwd, {}), skill);
+  assert.equal(findSkill('missing', bare.cwd, { HOME: home }), null);
 });
 
 test('policy: classifies files, detects AI, blocks on unjustified dependency and empty sections', () => {
