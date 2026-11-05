@@ -55,11 +55,11 @@ peneira 14            # or just `peneira` on the PR's branch
 1. **Resolves the PR**: `14`, `#14`, a PR URL, or nothing (the open PR of the current branch).
 
    Note: in bash, `peneira #14` treats `#14` as a comment and runs `peneira` with no argument,
-    which still works if you are on the PR's branch. Use `peneira 14` to be explicit.
+     which still works if you are on the PR's branch. Use `peneira 14` to be explicit.
 2. **Gate** (display only; CI owns labels and the guide comment): size budget counting only
 
    logic lines, linked ticket, required PR description sections, new dependencies, risk paths
-    and risky patterns in added lines. `--guide` prints the full reading order.
+     and risky patterns in added lines. `--guide` prints the full reading order.
 3. **Reviewers** run in parallel. Results already produced by CI for the same head commit are
 
    reused; local results are cached per commit in `.git/peneira/`. `--fresh` forces a re-run.
@@ -224,6 +224,10 @@ model to ignore instructions inside them; ponytail runs with read-only tools.
 npm test        # node:test, fixture repos, fake GitHub, fake runner CLIs; no network
 ```
 
-Layout: `src/commands/*` (CLI commands), `src/reviewers/*` (adapters), `src/policy.mjs` (gate),
-`src/triage.mjs` + `src/publish.mjs` (decisions to GitHub objects), `src/github.mjs` (the only
-module that talks to the platform), `templates/` (what `init` writes).
+Layout:  
+`src/commands/*` (CLI commands),   
+`src/reviewers/*` (adapters),   
+`src/policy.mjs` (gate),  
+`src/triage.mjs` + `src/publish.mjs` (decisions to GitHub objects),  
+`src/github.mjs` (the only module that talks to the platform),  
+`templates/` (what `init` writes).
