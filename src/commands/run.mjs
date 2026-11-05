@@ -23,7 +23,7 @@ export const RUN_HELP = `Usage: peneira [pr] [options]
 Options:
   --fresh            Ignore CI results and the local cache; run every reviewer locally.
   --only a,b         Run/triage only these reviewers (names from .peneira/config.json).
-  --all              Show findings already triaged before.
+  --all              Show findings already triaged before, except those already posted.
   --guide            Print the full Review guide (reading order).
   --list             Print the findings and exit (add --json for machine output).
   --decide SPEC      Non-interactive triage, e.g. "P1=c,P2=i,A1=f:unreachable,A3=g".
@@ -141,8 +141,10 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   const all = results.flatMap((r) => r.findings || []);
   const findings = sortFindings(dedupeFindings(all));
   if (all.length !== findings.length) io.print(c.dim(`${all.length - findings.length} duplicate finding(s) merged across reviewers.`));
-  const queue = o.all ? findings : findings.filter((f) => !previous[f.fingerprint]);
-  if (findings.length !== queue.length) io.print(c.dim(`${findings.length - queue.length} finding(s) triaged earlier (use --all to see them).`));
+  // --all brings back triaged findings, except those already posted to GitHub.
+  const queue = findings.filter((f) => !previous[f.fingerprint] || (o.all && !previous[f.fingerprint].posted));
+  if (findings.length !== queue.length) io.print(c.dim(o.all ? `${findings.length - queue.length} finding(s) already posted.`
+    : `${findings.length - queue.length} finding(s) triaged earlier (use --all to see the ones not posted).`));
 
   if (o.list) {
     if (o.json) io.print(JSON.stringify({ pr: { number: pr.number, title: pr.title, head }, gate: { status: report.status, blocking: report.blocking, warnings: report.warnings }, findings: queue }, null, 2));
@@ -174,6 +176,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   }
   mode ||= 'pending';
 
+  let posted = false;
   if (hasText && mode !== 'none') {
     const pub = buildPublication({ choices, index, mode, commitId: head });
     if (pub.movedToBody.length) {
@@ -184,6 +187,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
     else {
       try {
         const out = await publish(gh, pr.number, pub);
+        posted = true;
         io.print(c.green(`✔ ${mode === 'pending' ? 'Pending review saved (submit it in GitHub)' : 'Review submitted'}: ${out.review?.html_url || pr.url}`));
       } catch (e) {
         if (e.status === 422 && /pending/i.test(e.message)) throw new Error('You already have a pending review on this PR. Submit or discard it in GitHub, then run again.');
@@ -196,7 +200,8 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   for (const ch of choices) {
     const f = ch.finding;
     decisions[f.fingerprint] = { decision: ch.decision, id: f.id, source: f.source, group: f.group, title: f.title,
-      ...(ch.reason ? { reason: ch.reason } : {}), ...(ch.ticket ? { ticket: ch.ticket } : {}), at: new Date().toISOString() };
+      ...(ch.reason ? { reason: ch.reason } : {}), ...(ch.ticket ? { ticket: ch.ticket } : {}),
+      ...(posted && ch.text ? { posted: true } : {}), at: new Date().toISOString() };
   }
   if (choices.length && !o.dryRun) writeCache(remembered, decisions);
   return 0;

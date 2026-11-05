@@ -71,6 +71,12 @@ test('peneira 7 --decide: runs both reviewers locally, merges duplicates, posts 
   assert.equal(s.gh.state.llmCalls, 1, 'llm reused from cache');
   const listed = io2.log.filter((l) => /^(P|A)\d/.test(l)).map((l) => l.split(' ')[0]);
   assert.deepEqual(listed.sort(), ['P3']);
+
+  // --all brings back ignored/false-positive findings, but not the ones already posted
+  const io3 = scriptedIO([]);
+  await s.run(['7', '--list', '--all'], io3);
+  const all = io3.log.filter((l) => /^(P|A)\d/.test(l)).map((l) => l.split(' ')[0]);
+  assert.deepEqual(all.sort(), ['A2', 'P3', 'P4']);
 }));
 
 test('reuses CI results for the same head commit instead of running locally', withFetch(async (s) => {

@@ -65,7 +65,7 @@ peneira 14            # or just `peneira` on the PR's branch
    reused; local results are cached per commit in `.git/peneira/`. `--fresh` forces a re-run.
 4. **Triage**, Must fix first, all reviewers in one queue. Findings you triaged before are not
 
-   asked again (`--all` to see them).
+   asked again (`--all` to see them, except the ones already posted).
 5. **Publish** one GitHub review, pending by default.
 6. **Remember** your decisions in `.git/peneira/<pr>/triage.json` on this machine, so the next run skips findings you already triaged.
 
@@ -97,7 +97,7 @@ only gets what has no place in the code.
 ```
 --fresh            ignore CI results and the cache; run every reviewer locally
 --only a,b         only these reviewers
---all              include findings triaged before
+--all              include findings triaged before, except already posted ones
 --guide            print the full Review guide
 --list [--json]    print findings and exit
 --decide SPEC      non-interactive triage: "P1=c,P2=i,A1=f:unreachable,A3=g"
