@@ -15,12 +15,12 @@ export async function runMetrics({ argv = [], cwd, env, io, fetchImpl = globalTh
   for (const p of merged) {
     const [detail, reviews, comments] = await Promise.all([gh.getPr(p.number), gh.listReviews(p.number), gh.listComments(p.number)]);
     const human = reviews.filter((r) => r.user?.type !== 'Bot');
-    const first = human.map((r) => new Date(r.submitted_at)).sort((a, b) => a - b)[0];
+    const first = human.map((r) => Date.parse(r.submitted_at)).sort((a, b) => a - b)[0];
     rows.push({
       ai: p.labels.some((l) => l.name === 'ai-generated'),
       size: detail.additions + detail.deletions,
-      firstReview: first ? (first - new Date(p.created_at)) / 36e5 : null,
-      merge: (new Date(p.merged_at) - new Date(p.created_at)) / 36e5,
+      firstReview: first ? (first - Date.parse(p.created_at)) / 36e5 : null,
+      merge: (Date.parse(p.merged_at) - Date.parse(p.created_at)) / 36e5,
       changeRequests: human.filter((r) => r.state === 'CHANGES_REQUESTED').length,
     });
     for (const decisions of Object.values(readStore(comments).triage)) {

@@ -30,9 +30,7 @@ export function createGitHub({ token, repo, apiUrl = 'https://api.github.com', f
     });
     if (res.status === 404 && method === 'DELETE') return null;
     if (!res.ok) {
-      const err = new Error(`GitHub ${method} ${path} -> ${res.status}: ${(await res.text()).slice(0, 500)}`);
-      err.status = res.status;
-      throw err;
+      throw Object.assign(new Error(`GitHub ${method} ${path} -> ${res.status}: ${(await res.text()).slice(0, 500)}`), { status: res.status });
     }
     return res.status === 204 ? null : res.json();
   }

@@ -30,7 +30,7 @@ export function section(body, name) {
 }
 
 /**
- * @param {{cwd:string, cfg:object, pr:{baseSha,headSha,title,body,headRef,labels,draft}}} args
+ * @param {{cwd:string, cfg:any, pr:{baseSha,headSha,title,body,headRef,labels,draft?}}} args
  * baseSha should be the merge base, so the diff matches what GitHub shows.
  */
 export function runPolicy({ cwd, cfg, pr }) {

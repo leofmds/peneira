@@ -14,7 +14,7 @@ export function terminalIO({ stdin = process.stdin, stdout = process.stdout, env
   return {
     color: colors(stdout.isTTY && !env.NO_COLOR),
     interactive: !!stdin.isTTY,
-    print: (s = '') => stdout.write(`${s}\n`),
+    print: (s = '') => { stdout.write(`${s}\n`); },
     async ask(q) {
       const rl = createInterface({ input: stdin, output: stdout });
       try { return (await rl.question(q)).trim(); } finally { rl.close(); }
@@ -38,7 +38,7 @@ export function scriptedIO(answers, { log = [] } = {}) {
     color: colors(false),
     interactive: false,
     log,
-    print: (s = '') => log.push(String(s)),
+    print: (s = '') => { log.push(String(s)); },
     async ask(q) { const a = queue.length ? queue.shift() : 'q'; log.push(`${q}${a}`); return String(a).trim(); },
     edit: (initial) => (queue.length && String(queue[0]).startsWith('EDIT:') ? queue.shift().slice(5) : initial),
   };

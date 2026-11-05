@@ -16,6 +16,7 @@ const write = (root, files) => {
 const workerFile = (head) => [...head, ...Array.from({ length: 30 }, (_, i) => `// filler ${i}`), 'export const tail = 1;', ''].join('\n');
 
 /** A repo with main + a feature branch that looks like an AI-written PR. */
+/** @param {{config?: object}} [opts] */
 export function fixtureRepo({ config } = {}) {
   const cwd = mkdtempSync(join(tmpdir(), 'rg-repo-'));
   sh(cwd, 'init', '-q', '-b', 'main');
@@ -54,6 +55,7 @@ export function fixtureRepo({ config } = {}) {
 }
 
 /** In-memory GitHub REST API good enough for peneira. */
+/** @param {{baseSha?:string, headSha?:string, number?:number, body?:string, login?:string, comments?:any[]}} [opts] */
 export function fakeGitHub({ baseSha, headSha, number = 7, body = '', login = 'leo', comments = [] } = {}) {
   const state = {
     comments: comments.map((c, i) => ({ id: i + 1, ...c })),
@@ -109,6 +111,7 @@ export function fakeGitHub({ baseSha, headSha, number = 7, body = '', login = 'l
 }
 
 /** A fake `claude` binary that prints a ponytail-style report and counts its invocations. */
+/** @param {object[]} findings @param {{counterFile?: string}} [opts] */
 export function fakeClaude(findings, { counterFile } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'rg-bin-'));
   const bin = join(dir, 'claude');

@@ -14,9 +14,10 @@ node --test test/unit.test.mjs              # one file
 node --test --test-name-pattern "dedupe" test/run.test.mjs   # one test by name
 node bin/peneira.mjs 14 --dry-run           # run locally against PR #14 without writing to GitHub
 PENEIRA_DEBUG=1 node bin/peneira.mjs ...    # print stack traces on errors
+npm run typecheck                           # tsc --checkJs, no emit (devDependency only; runtime stays zero-dep)
 ```
 
-There is no linter or typechecker configured.
+Type errors in JS are fixed with defaults or JSDoc (`@param {{...}}`), not `// @ts-ignore`. `strict` is off.
 
 ## Architecture
 

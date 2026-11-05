@@ -9,6 +9,7 @@ const GROUP_ICON = { must: '🔴', should: '🟠', nice: '🟡' };
 const SARIF_LEVEL = { must: 'error', should: 'warning', nice: 'note' };
 const FROM_LEVEL = { error: 'must', warning: 'should', note: 'nice', none: 'nice' };
 
+/** @param {{id:string, source:string, group?:string, title:string, file?:string, line?:number, endLine?:number, parts?:object}} f */
 export function makeFinding({ id, source, group, title, file, line, endLine, parts }) {
   const cleanFile = file ? String(file).replace(/^\.?\//, '').replace(/:L?\d+(-L?\d+)?$/, '') : null;
   const ln = Number.isInteger(line) && line > 0 ? line : null;
@@ -85,7 +86,7 @@ export function toSarif(findings, toolName = 'peneira') {
 }
 
 // ---------- rendering the bot comment ----------
-export function renderBotComment({ title, intro, findings, footer, visibility }) {
+export function renderBotComment({ title, intro, findings, footer = '', visibility }) {
   const counts = GROUPS.map((g) => `${GROUP_ICON[g]} ${findings.filter((f) => f.group === g).length} ${GROUP_LABEL[g].toLowerCase()}`).join(' · ');
   let details;
   if (!findings.length) details = '_No findings._';

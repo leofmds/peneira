@@ -91,7 +91,7 @@ function agentAvailable(conf, cfg, env) {
   return { ok: true };
 }
 
-export function available({ conf = {}, cfg, env = process.env }) {
+export function available({ conf = {}, cfg = {}, env = process.env }) {
   let transport;
   try { transport = resolveTransport(conf, env); }
   catch (e) { return { ok: false, reason: e.message }; }
@@ -158,7 +158,7 @@ function agentArgs(name, { system, user, cwd, model, outFile, skill }) {
   return args;
 }
 
-async function callAgent({ conf, cfg, cwd, env, system, user, model, skill }) {
+async function callAgent({ conf, cfg, cwd, env, system, user, model, skill = false }) {
   const runner = resolveRunner({ runner: conf.runner || cfg?.reviewers?.ponytail?.runner }, env);
   let dir = null;
   let outFile = null;
@@ -207,7 +207,7 @@ export function normalize(result, { prefix, source }) {
   return findings;
 }
 
-export async function run({ name, conf, cfg, cwd, base, head, pr, report, env = process.env, fetchImpl = globalThis.fetch }) {
+export async function run({ name, conf, cfg = {}, cwd, base, head, pr, report, env = process.env, fetchImpl = globalThis.fetch }) {
   const transport = resolveTransport(conf, env);
   const provider = env.REVIEW_PROVIDER || conf.provider || 'anthropic';
   const model = env.REVIEW_MODEL || conf.model;

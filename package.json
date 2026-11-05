@@ -19,7 +19,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "typecheck": "tsc"
   },
   "repository": {
     "type": "git",
@@ -39,5 +40,9 @@
     "sarif",
     "claude-code",
     "human-in-the-loop"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^7.0.2"
+  }
 }
