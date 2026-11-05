@@ -39,7 +39,7 @@ Key contracts:
 - **PR state store** (`store.mjs`): CI persists reviewer results in sticky issue comments with `<!-- peneira:reviewer:NAME -->` markers and a base64 `<!-- peneira:data ... -->` block. Only this module knows the marker formats.
 - **Config** (`config.mjs`): `DEFAULTS` → `~/.peneira/config.json` → `.peneira/config.json`. Objects deep-merge and arrays replace. Scope values `all|ai|ai-or-risk|none` go through `appliesTo`.
 
-`templates/` holds what `peneira init` writes into *target* repos (AGENTS.md, slash commands, workflows, presets). It is not config for this repo. `action.yml` is the composite GitHub Action those workflows call. `plans/archive/` holds old design notes.
+`templates/` holds what `peneira init` writes into *target* repos (AGENTS.md, slash commands, workflows, presets). It is not config for this repo. `action.yml` is the composite GitHub Action those workflows call.
 
 ## Tests
 
