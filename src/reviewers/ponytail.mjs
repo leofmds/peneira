@@ -20,8 +20,10 @@ const SCHEMA = `{
   "not_checked": string | null,
   "findings": [ { "number": number, "group": "must" | "should" | "nice", "title": string,
     "file": string | null, "line_start": number | null, "line_end": number | null,
-    "what_this_is": string, "problem": string, "fix": string, "if_we_skip_it": string } ]
-}`;
+    "problem": string, "fix": string } ]
+}
+title: 8 words or fewer, names what to cut. problem: one sentence, what is unnecessary and why.
+fix: one sentence, what replaces it.`;
 
 function skillSource(cwd) {
   if (existsSync(join(cwd, REPO_SKILL))) return { kind: 'repo', path: REPO_SKILL };
@@ -58,8 +60,9 @@ export function buildPrompt({ src, base, head }) {
   return `${how}
 Review the change between ${base} and ${head}: start with \`git diff ${base}...${head}\`,
 then read the code it touches as the skill says. Do not modify any file.
+Only flag code this change adds or modifies. Zero findings is a good answer.
 
-Write the full report exactly as the skill's Output section describes.
+Write the report in the format the skill describes.
 After the report, append ONE fenced \`\`\`json block containing the same findings, with the
 same numbers, matching this shape (group: must = Must fix, should = Should fix, nice = Nice to have;
 line numbers refer to the NEW version of the file):
@@ -78,7 +81,7 @@ export function parse(text, { prefix, source }) {
     file: f.file,
     line: f.line_start,
     endLine: f.line_end,
-    parts: { 'What this is': f.what_this_is, Problem: f.problem, Fix: f.fix, 'If we skip it': f.if_we_skip_it },
+    parts: { Problem: f.problem, Fix: f.fix },
   }));
   const intro = [
     data.what_this_change_does && `**What this change does:** ${data.what_this_change_does}`,

@@ -1,5 +1,5 @@
-// Default review skills, ranked by skills.sh installs and repo stars (late 2026).
-// The first one installed is the reviewer. The built-in prompt is the backup.
+// Known review skills, ranked by skills.sh installs and repo stars (late 2026).
+// Install hints for skills named in reviewers.llm.skills (opt-in; the built-in prompt is the default).
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -20,8 +20,6 @@ export const REVIEW_SKILLS = [
     install: 'npx skills add addyosmani/agent-skills --skill code-review-and-quality -g -y',
   },
 ];
-
-export const REVIEW_SKILL_NAMES = REVIEW_SKILLS.map((s) => s.name);
 
 const SKILL_DIRS = ['.agents/skills', '.claude/skills', '.cursor/skills'];
 

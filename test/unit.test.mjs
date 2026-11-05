@@ -38,11 +38,11 @@ test('config: repo file overrides defaults, arrays replace', () => {
   assert.deepEqual(cfg.ignore, ['x']);
 });
 
-test('config: ~/.peneira/config.json sets the default skills, the repo file replaces them', () => {
+test('config: skills are opt-in, ~/.peneira/config.json sets them, the repo file replaces them', () => {
   const home = mkdtempSync(join(tmpdir(), 'rg-home-'));
   ensureUserConfig({ HOME: home });
   const bare = fixtureRepo();
-  assert.deepEqual(loadConfig(bare.cwd, { HOME: home }).reviewers.llm.skills, ['code-review', 'requesting-code-review', 'code-review-and-quality']);
+  assert.deepEqual(loadConfig(bare.cwd, { HOME: home }).reviewers.llm.skills, []);
   const over = fixtureRepo({ config: { reviewers: { llm: { skills: ['only-repo'] } } } });
   assert.deepEqual(loadConfig(over.cwd, { HOME: home }).reviewers.llm.skills, ['only-repo']);
   const skill = join(bare.cwd, '.agents/skills/code-review/SKILL.md');

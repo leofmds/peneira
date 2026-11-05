@@ -130,13 +130,13 @@ console.log(JSON.stringify({ type: 'result', result }));
 
 export const PONYTAIL_FINDINGS = [
   { number: 1, group: 'must', title: 'Retries insert duplicates', file: 'src/ingestion/worker.js', line_start: 2, line_end: 3,
-    what_this_is: 'Worker inserts a batch.', problem: 'A retry re-inserts the whole batch.', fix: 'Insert with dedupe_key.', if_we_skip_it: 'Counts drift.' },
+    problem: 'A retry re-inserts the whole batch.', fix: 'Insert with dedupe_key.' },
   { number: 2, group: 'should', title: 'Empty test', file: 'test/worker.test.js', line_start: 1, line_end: null,
-    what_this_is: 'Test file.', problem: 'No assertion.', fix: 'Assert one row after duplicate delivery.', if_we_skip_it: 'Bug ships.' },
+    problem: 'No assertion.', fix: 'Assert one row after duplicate delivery.' },
   { number: 3, group: 'nice', title: 'Tail export unused', file: 'src/ingestion/worker.js', line_start: 35, line_end: null,
-    what_this_is: 'Export.', problem: 'Never imported.', fix: 'Delete it.', if_we_skip_it: 'Dead code.' },
+    problem: 'Never imported.', fix: 'Delete it.' },
   { number: 4, group: 'nice', title: 'Helper name is vague', file: 'src/util/format.js', line_start: 1, line_end: null,
-    what_this_is: 'Helper.', problem: 'Name a() says nothing.', fix: 'Rename.', if_we_skip_it: 'Harder to read.' },
+    problem: 'Name a() says nothing.', fix: 'Rename.' },
 ];
 
 export function withSkill(cwd) {

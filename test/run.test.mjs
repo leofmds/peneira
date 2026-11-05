@@ -13,10 +13,13 @@ import { fixtureRepo, fakeGitHub, fakeClaude, withSkill, scriptedIO, PONYTAIL_FI
 
 const LLM_RESULT = {
   intent_match: { status: 'partial', notes: 'no dedupe on insert' },
-  out_of_scope_files: [{ file: 'src/util/renamed.js', reason: 'Rename unrelated to PLAT-482.' }],
-  unstated_assumptions: [], questions_for_author: [],
-  findings: [{ severity: 'major', category: 'idempotency', file: 'src/ingestion/worker.js', line: 3, issue: 'No dedupe key check.', suggestion: 'Check dedupe_key.' }],
-  tests: { covers_spec: true, notes: '' },
+  questions_for_author: [],
+  findings: [
+    { group: 'should', title: 'No dedupe key check', file: 'src/ingestion/worker.js', line_start: 3, line_end: null,
+      happens: 'No dedupe key check. A redelivered batch is inserted twice.', evidence: 'db.insert(batch)', fix: 'Check dedupe_key.', unsure: null },
+    { group: 'should', title: 'Unrelated rename', file: 'src/util/renamed.js', line_start: null, line_end: null,
+      happens: 'Rename unrelated to PLAT-482.', evidence: 'git mv', fix: 'Move it to its own PR.', unsure: null },
+  ],
 };
 
 function setup({ comments = [], llm = true } = {}) {
@@ -159,7 +162,7 @@ test('--list --json gives the /pr-review command everything it needs', withFetch
   assert.equal(json.pr.number, 7);
   assert.equal(json.gate.status, 'blocked');
   assert.deepEqual(json.findings.map((f) => f.id), ['P1', 'P2', 'P3', 'P4']);
-  assert.deepEqual(Object.keys(json.findings[0].parts), ['What this is', 'Problem', 'Fix', 'If we skip it']);
+  assert.deepEqual(Object.keys(json.findings[0].parts), ['Problem', 'Fix']);
 }));
 
 test('each runner: read-only flag, and its output becomes findings', async () => {
@@ -248,7 +251,7 @@ else process.stdout.write(JSON.stringify({ result: text }));
     if (runner === 'claude') {
       assert.equal(argv[argv.indexOf('--tools') + 1], '');
       assert.equal(argv[argv.indexOf('--max-turns') + 1], '1');
-      assert.match(argv[argv.indexOf('--system-prompt') + 1], /principal engineer/);
+      assert.match(argv[argv.indexOf('--system-prompt') + 1], /Report only defects this PR introduces/);
       assert.equal(argv.includes('--bare'), false);
       assert.equal(argv.includes('--allowedTools'), false);
       assert.match(argv[argv.indexOf('-p') + 1], /## DIFF/);

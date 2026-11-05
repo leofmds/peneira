@@ -16,7 +16,7 @@ author sees. Every posted comment is a human decision.
 ✔ PR #14 "PLAT-482 Dedupe events on retry"  @claude-bot · head c6e7654
 ● Gate: warnings · 212 logic lines / 6 files · AI-generated · risk: high
 ✔ ponytail: 3 finding(s) [CI]
-✔ llm (code-review): 4 finding(s) [local]
+✔ llm: 4 finding(s) [local]
 ✔ semgrep: 1 finding(s) [local]
 
 Triage: 8 finding(s) (1 must, 5 should, 2 nice)
@@ -124,7 +124,7 @@ ids), and `runFor`: `all` (the default, unless `.peneira/config.json` sets it), 
 | Type | What it is | Needs |
 |---|---|---|
 | `ponytail` | The [ponytail-review](https://github.com/DietrichGebert/ponytail) skill (MIT), run headless through Claude Code, the Cursor agent CLI, or Codex. Reads callers, tests and expected load, not only the diff. Read-only: Claude's tool allowlist, Cursor ask mode, or Codex `--sandbox read-only`. | `reviewers.ponytail.runner`: `claude` (default), `cursor`, or `codex`, overridden by `PENEIRA_RUNNER`. That CLI, and the skill at `.agents/skills/ponytail-review/SKILL.md` (`init --with-ponytail`; `.claude/skills/...` and the Claude plugin still count) |
-| `llm` | The first installed skill in `reviewers.llm.skills` (see [Review skill](#review-skill)). It reviews read-only and does not post. With none installed, a built-in prompt judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set) and the CLI prints how to install the missing skills. `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. `transport` defaults to `auto`: the HTTP API when `REVIEW_API_KEY` is set, otherwise the ponytail runner's logged-in CLI. GitHub Actions without that key still skips. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) for the backup HTTP prompt. `REVIEW_TRANSPORT` (`auto`, `api`, `agent`) overrides `transport`. |
+| `llm` | A built-in prompt that looks only for defects the PR introduces and judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set). An installed skill from `reviewers.llm.skills` can guide where it looks (opt-in, see [Review skill](#review-skill)). It reviews read-only and does not post. `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. `transport` defaults to `auto`: the HTTP API when `REVIEW_API_KEY` is set, otherwise the ponytail runner's logged-in CLI. GitHub Actions without that key still skips. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) for the backup HTTP prompt. `REVIEW_TRANSPORT` (`auto`, `api`, `agent`) overrides `transport`. |
 | `sarif` | Any tool that emits SARIF: semgrep, CodeQL, eslint... `command` may use `{base}` and `{head}`; `requires` names a binary that must exist; `output` reads a file instead of stdout. | the tool |
 
 The order of `reviewers` is their priority (`llm` before `ponytail` by default; keys from `DEFAULTS` keep that order, extra reviewers come after). Findings are listed in that order within each severity, and when two reviewers flag overlapping lines (±2) of the same file, only the earlier one is kept: it takes the more severe group and names the dropped finding under "Also flagged by".
@@ -189,15 +189,17 @@ then `ai`.
 
 ## Review skill
 
-`reviewers.llm.skills` is the preference order. The first name whose `SKILL.md` exists is the reviewer. Peneira looks in `.agents/skills/<name>/`, `.claude/skills/<name>/`, and `.cursor/skills/<name>/`, in the repo first and then under your home directory.
+By default the `llm` reviewer uses peneira's built-in prompt. It reports only defects the PR introduces: wrong results, crashes, data loss, reachable security issues, spec mismatches, and breaks of written repo rules. Style, smells and "consider adding tests" are left out. Each finding says what happens (input, then the wrong result), quotes the evidence, and gives a one-line fix. Zero findings is a valid result.
 
-The default list is `code-review`, `requesting-code-review`, and `code-review-and-quality`. To use your own skill on every repo, set the list in `~/.peneira/config.json`:
+`reviewers.llm.skills` is an opt-in preference order. The first name whose `SKILL.md` exists tells the reviewer where to look. The built-in rules still decide what gets reported. Peneira looks in `.agents/skills/<name>/`, `.claude/skills/<name>/`, and `.cursor/skills/<name>/`, in the repo first and then under your home directory.
+
+The default list is empty. To use a skill on every repo, set the list in `~/.peneira/config.json`:
 
 ```json
 { "reviewers": { "llm": { "skills": ["the-judge"] } } }
 ```
 
-A repo replaces that list by setting `skills` in `.peneira/config.json`. Leaving `skills` out keeps the global list. `skills: []` turns the skill reviewer off and uses the built-in prompt.
+A repo replaces that list by setting `skills` in `.peneira/config.json`. Leaving `skills` out keeps the global list. `skills: []` goes back to the built-in prompt alone.
 
 ```json
 { "reviewers": { "llm": { "skills": ["our-review"] } } }
