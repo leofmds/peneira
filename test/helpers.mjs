@@ -97,6 +97,11 @@ export function fakeGitHub({ baseSha, headSha, number = 7, body = '', login = 'l
       return json({ id: state.nextId++ }, 201);
     }
     if (method === 'POST' && path === `/repos/o/r/issues/${number}/labels`) { state.labels.push(...body.labels); return json([]); }
+    if (method === 'DELETE' && path.startsWith('/repos/o/r/issues/comments/')) {
+      const id = Number(path.split('/').pop());
+      state.comments = state.comments.filter((c) => c.id !== id);
+      return json(null, 204);
+    }
     if (method === 'DELETE' && path.startsWith(`/repos/o/r/issues/${number}/labels/`)) return json(null, 204);
     return json({ message: `no route ${method} ${path}` }, 404);
   };

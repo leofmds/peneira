@@ -9,7 +9,7 @@ import { createGitHub, parseRepoFromRemote, resolveToken } from '../github.mjs';
 import { ensureCommits, mergeBase, resolvePr } from '../pr.mjs';
 import { runPolicy, renderGuide } from '../policy.mjs';
 import { plannedReviewers, runReviewer } from '../reviewers/index.mjs';
-import { readStore, MARKERS, encodeData } from '../store.mjs';
+import { readStore, MARKERS } from '../store.mjs';
 import { sortFindings, location, GROUP_LABEL } from '../findings.mjs';
 import { diffIndex } from '../diffindex.mjs';
 import { triageInteractive, parseDecisionSpec, applyDecisionSpec } from '../triage.mjs';
@@ -58,6 +58,9 @@ export function parseRunArgs(argv) {
 
 function cachePath(cwd, pr, name) {
   return join(gitDir(cwd), 'peneira', String(pr.number), pr.headSha, `${name}.json`);
+}
+function triagePath(cwd, pr) {
+  return join(gitDir(cwd), 'peneira', String(pr.number), 'triage.json');
 }
 function readCache(path) {
   try { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null; } catch { return null; }
@@ -122,9 +125,18 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
     }
   }
 
-  // 4. Queue
+  // 4. Queue. Decisions live in .git so the PR stays empty. An old blank triage comment is copied once, then deleted.
   const me = await gh.me();
-  const previous = store.triage[me] || {};
+  const remembered = triagePath(cwd, pr);
+  const local = readCache(remembered) || {};
+  const previous = { ...(store.triage[me] || {}), ...local };
+  if (!o.dryRun) {
+    const sticky = comments.find((c) => c.body?.startsWith(MARKERS.triage(me)));
+    if (sticky) {
+      writeCache(remembered, previous);
+      await gh.deleteComment(sticky.id);
+    }
+  }
   const findings = sortFindings(results.flatMap((r) => r.findings || []));
   const queue = o.all ? findings : findings.filter((f) => !previous[f.fingerprint]);
   if (findings.length !== queue.length) io.print(c.dim(`${findings.length - queue.length} finding(s) triaged earlier (use --all to see them).`));
@@ -177,15 +189,12 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
     }
   }
 
-  // 7. Remember decisions in a sticky comment. Both lines are HTML comments, so the PR shows nothing.
   const decisions = { ...previous };
   for (const ch of choices) {
     const f = ch.finding;
     decisions[f.fingerprint] = { decision: ch.decision, id: f.id, source: f.source, group: f.group, title: f.title,
       ...(ch.reason ? { reason: ch.reason } : {}), ...(ch.ticket ? { ticket: ch.ticket } : {}), at: new Date().toISOString() };
   }
-  if (choices.length && !o.dryRun) {
-    await gh.upsertSticky(pr.number, MARKERS.triage(me), encodeData({ reviewer: me, decisions }), comments);
-  }
+  if (choices.length && !o.dryRun) writeCache(remembered, decisions);
   return 0;
 }

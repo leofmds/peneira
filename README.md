@@ -67,7 +67,7 @@ peneira 14            # or just `peneira` on the PR's branch
 
    asked again (`--all` to see them).
 5. **Publish** one GitHub review, pending by default.
-6. **Remember** your decisions in a hidden PR comment, so the next run skips findings you already triaged.
+6. **Remember** your decisions in `.git/peneira/<pr>/triage.json` on this machine, so the next run skips findings you already triaged.
 
 ### Where each comment goes
 
@@ -206,9 +206,8 @@ A repo replaces that list by setting `skills` in `.peneira/config.json`. Leaving
 ## Metrics
 
 `peneira metrics --days 14` (and the weekly workflow): first-pass merge rate, change-request
-rounds, time to first review and size for AI-generated vs other PRs, plus triage outcomes per
-reviewer. A reviewer with a high false-positive rate needs tuning; a high ignored rate means it
-reports things the team does not care about.
+rounds, time to first review and size for AI-generated vs other PRs. New triage decisions stay
+in `.git/peneira/` on the reviewer's machine. The report still counts decisions left in older PR comments.
 
 ## Security model
 

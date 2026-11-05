@@ -69,6 +69,7 @@ export function createGitHub({ token, repo, apiUrl = 'https://api.github.com', f
       if (existing) return request('PATCH', `${r}/issues/comments/${existing.id}`, { body: full });
       return request('POST', `${r}/issues/${n}/comments`, { body: full });
     },
+    deleteComment: (id) => request('DELETE', `${r}/issues/comments/${id}`),
     async syncLabels(n, current, wanted, managed) {
       const add = wanted.filter((l) => !current.includes(l));
       const remove = managed.filter((l) => current.includes(l) && !wanted.includes(l));

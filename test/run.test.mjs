@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync, mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gitDir } from '../src/git.mjs';
 import { main } from '../src/cli.mjs';
 import { makeFinding } from '../src/findings.mjs';
 import * as ponytail from '../src/reviewers/ponytail.mjs';
 import * as llm from '../src/reviewers/llm.mjs';
-import { MARKERS, withData, readStore } from '../src/store.mjs';
+import { MARKERS, withData } from '../src/store.mjs';
 import { fixtureRepo, fakeGitHub, fakeClaude, withSkill, scriptedIO, PONYTAIL_FINDINGS } from './helpers.mjs';
 
 const LLM_RESULT = {
@@ -37,6 +38,8 @@ function setup({ comments = [], llm = true } = {}) {
 }
 
 // main() uses the real fetch; route it through the fake for these tests.
+const triageFile = (repo) => join(gitDir(repo.cwd), 'peneira', '7', 'triage.json');
+
 const realFetch = globalThis.fetch;
 function withFetch(fn) { return async (t) => { const s = setup(t.setupOpts); globalThis.fetch = s.gh.fetchImpl; try { await fn(s); } finally { globalThis.fetch = realFetch; } }; }
 
@@ -55,9 +58,9 @@ test('peneira 7 --decide: runs both reviewers locally, posts separate inline thr
   assert.match(review.comments[0].body, /Retries insert duplicates/);
   assert.equal(review.body, undefined, 'nothing forced into the review body');
 
-  const store = readStore(s.gh.state.comments);
-  const decisions = Object.values(store.triage.leo);
+  const decisions = Object.values(JSON.parse(readFileSync(triageFile(s.repo), 'utf8')));
   assert.deepEqual(decisions.map((d) => d.decision).sort(), ['commented', 'commented', 'false-positive', 'ignored']);
+  assert.ok(!s.gh.state.comments.some((c) => c.body?.startsWith(MARKERS.triage('leo'))), 'triage is not posted on the PR');
   assert.ok(!s.gh.state.comments.some((c) => /Retries insert duplicates/.test(c.body)), 'triage log does not leak finding titles');
 
   // second run: the cache prevents re-running reviewers, decided findings are not asked again
@@ -97,7 +100,7 @@ test('interactive: back, edit, false positive, then submit -> off-diff finding b
   assert.match(review.comments[1].body, /Please assert one row/);
   assert.deepEqual(s.gh.state.fileComments.map((c) => [c.path, c.subject_type]), [['src/ingestion/worker.js', 'file']]);
   assert.match(s.gh.state.fileComments[0].body, /Tail export unused/);
-  const d = Object.values(readStore(s.gh.state.comments).triage.leo);
+  const d = Object.values(JSON.parse(readFileSync(triageFile(s.repo), 'utf8')));
   assert.equal(d.find((x) => x.id === 'P4').reason, 'it is used by the CLI');
   assert.equal(d.find((x) => x.id === 'P2').decision, 'commented-edited');
 }));
@@ -127,8 +130,19 @@ test('--dry-run prints the payload and writes nothing to GitHub', withFetch(asyn
   const io = scriptedIO([]);
   await s.run(['7', '--only', 'ponytail', '--decide', 'P1=c', '--dry-run'], io);
   assert.equal(s.gh.state.reviews.length, 0);
-  assert.ok(!s.gh.state.calls.some((c) => c.startsWith('POST') || c.startsWith('PATCH')));
+  assert.ok(!s.gh.state.calls.some((c) => c.startsWith('POST') || c.startsWith('PATCH') || c.startsWith('DELETE')));
+  assert.equal(existsSync(triageFile(s.repo)), false);
   assert.ok(io.log.some((l) => l.includes('[dry-run] would post')));
+}));
+
+test('an old triage comment is removed and its decisions still skip findings', withFetch(async (s) => {
+  const f = makeFinding({ id: 'P1', source: 'ponytail', group: 'must', title: 'Retries insert duplicates', file: 'src/ingestion/worker.js', line: 2, parts: { Problem: 'x' } });
+  s.gh.state.comments.push({ id: 9, body: `${MARKERS.triage('leo')}\n${withData('', { decisions: { [f.fingerprint]: { decision: 'ignored', id: 'P1' } } })}` });
+  const io = scriptedIO([]);
+  await s.run(['7', '--list', '--only', 'ponytail'], io);
+  assert.ok(!s.gh.state.comments.some((c) => c.body?.startsWith(MARKERS.triage('leo'))));
+  assert.ok(!io.log.some((l) => l.includes('Retries insert duplicates')));
+  assert.equal(JSON.parse(readFileSync(triageFile(s.repo), 'utf8'))[f.fingerprint].decision, 'ignored');
 }));
 
 test('--list --json gives the /pr-review command everything it needs', withFetch(async (s) => {
