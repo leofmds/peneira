@@ -10,7 +10,7 @@ import { ensureCommits, mergeBase, resolvePr } from '../pr.mjs';
 import { runPolicy, renderGuide } from '../policy.mjs';
 import { plannedReviewers, runReviewer } from '../reviewers/index.mjs';
 import { readStore, MARKERS } from '../store.mjs';
-import { sortFindings, location, GROUP_LABEL } from '../findings.mjs';
+import { sortFindings, dedupeFindings, location, GROUP_LABEL } from '../findings.mjs';
 import { diffIndex } from '../diffindex.mjs';
 import { triageInteractive, parseDecisionSpec, applyDecisionSpec } from '../triage.mjs';
 import { buildPublication, publish, MODES } from '../publish.mjs';
@@ -137,7 +137,10 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
       await gh.deleteComment(sticky.id);
     }
   }
-  const findings = sortFindings(results.flatMap((r) => r.findings || []));
+  // Results follow config order (llm before ponytail), so on overlap the code-review finding wins.
+  const all = results.flatMap((r) => r.findings || []);
+  const findings = sortFindings(dedupeFindings(all));
+  if (all.length !== findings.length) io.print(c.dim(`${all.length - findings.length} duplicate finding(s) merged across reviewers.`));
   const queue = o.all ? findings : findings.filter((f) => !previous[f.fingerprint]);
   if (findings.length !== queue.length) io.print(c.dim(`${findings.length - queue.length} finding(s) triaged earlier (use --all to see them).`));
 

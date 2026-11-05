@@ -8,7 +8,7 @@ import { parseRepoFromRemote } from '../src/github.mjs';
 import { loadConfig, DEFAULTS, ensureUserConfig } from '../src/config.mjs';
 import { findSkill, installHint, resolveReviewSkill } from '../src/reviewers/skills.mjs';
 import { runPolicy } from '../src/policy.mjs';
-import { makeFinding, fromSarif, toSarif } from '../src/findings.mjs';
+import { makeFinding, fromSarif, toSarif, dedupeFindings } from '../src/findings.mjs';
 import { readStore, MARKERS, withData } from '../src/store.mjs';
 import { diffIndex } from '../src/diffindex.mjs';
 import { buildPublication } from '../src/publish.mjs';
@@ -139,4 +139,16 @@ test('decision spec: parses, applies, rejects unknown ids', () => {
   assert.equal(out[1].reason, 'unreachable');
   assert.throws(() => applyDecisionSpec(q, parseDecisionSpec('Z9=c')), /Unknown finding/);
   assert.throws(() => parseDecisionSpec('P1=x'), /Bad decision/);
+});
+
+test('dedupeFindings: earlier reviewer wins on overlapping lines, keeps the worse group', () => {
+  const a = makeFinding({ id: 'A1', source: 'llm', group: 'nice', title: 'Off-by-one in loop', file: 'src/x.js', line: 10, endLine: 12 });
+  const p = makeFinding({ id: 'P1', source: 'ponytail', group: 'must', title: 'Remove manual loop', file: 'src/x.js', line: 13 });
+  const far = makeFinding({ id: 'P2', source: 'ponytail', title: 'Dead helper', file: 'src/x.js', line: 40 });
+  const same = makeFinding({ id: 'A2', source: 'llm', title: 'Second llm issue', file: 'src/x.js', line: 11 });
+  const out = dedupeFindings([a, same, p, far]);
+  assert.deepEqual(out.map((f) => f.id), ['A1', 'A2', 'P2']);
+  assert.equal(out[0].group, 'must');
+  assert.match(out[0].parts['Also flagged by'], /ponytail P1: Remove manual loop/);
+  assert.equal(a.group, 'nice', 'input is not mutated');
 });

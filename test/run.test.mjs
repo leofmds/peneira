@@ -43,9 +43,9 @@ const triageFile = (repo) => join(gitDir(repo.cwd), 'peneira', '7', 'triage.json
 const realFetch = globalThis.fetch;
 function withFetch(fn) { return async (t) => { const s = setup(t.setupOpts); globalThis.fetch = s.gh.fetchImpl; try { await fn(s); } finally { globalThis.fetch = realFetch; } }; }
 
-test('peneira 7 --decide: runs both reviewers locally, posts separate inline threads, remembers decisions', withFetch(async (s) => {
+test('peneira 7 --decide: runs both reviewers locally, merges duplicates, posts separate inline threads, remembers decisions', withFetch(async (s) => {
   const io = scriptedIO([]);
-  const code = await s.run(['7', '--decide', 'P1=c,P2=c,A1=i,P4=f:helper is fine', '--submit', 'pending'], io);
+  const code = await s.run(['7', '--decide', 'A1=c,P2=c,A2=i,P4=f:helper is fine', '--submit', 'pending'], io);
   assert.equal(code, 0, io.log.join('\n'));
   assert.equal(s.claudeCalls(), 1);
   assert.equal(s.gh.state.llmCalls, 1);
@@ -54,8 +54,9 @@ test('peneira 7 --decide: runs both reviewers locally, posts separate inline thr
   assert.equal(review.event, undefined, 'pending review');
   assert.equal(review.commit_id, s.repo.headSha);
   assert.deepEqual(review.comments.map((c) => [c.path, c.start_line ?? null, c.line]),
-    [['src/ingestion/worker.js', 2, 3], ['test/worker.test.js', null, 1]], 'one thread per finding, anchored');
-  assert.match(review.comments[0].body, /Retries insert duplicates/);
+    [['src/ingestion/worker.js', null, 3], ['test/worker.test.js', null, 1]], 'one thread per finding, anchored');
+  assert.match(review.comments[0].body, /No dedupe key check[\s\S]*Also flagged by:\*\* ponytail P1: Retries insert duplicates/, 'ponytail P1 merged into the llm finding');
+  assert.ok(io.log.some((l) => l.includes('1 duplicate finding(s) merged')));
   assert.equal(review.body, undefined, 'nothing forced into the review body');
 
   const decisions = Object.values(JSON.parse(readFileSync(triageFile(s.repo), 'utf8')));
@@ -69,7 +70,7 @@ test('peneira 7 --decide: runs both reviewers locally, posts separate inline thr
   assert.equal(s.claudeCalls(), 1, 'ponytail reused from cache');
   assert.equal(s.gh.state.llmCalls, 1, 'llm reused from cache');
   const listed = io2.log.filter((l) => /^(P|A)\d/.test(l)).map((l) => l.split(' ')[0]);
-  assert.deepEqual(listed.sort(), ['A2', 'P3']);
+  assert.deepEqual(listed.sort(), ['P3']);
 }));
 
 test('reuses CI results for the same head commit instead of running locally', withFetch(async (s) => {

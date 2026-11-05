@@ -127,6 +127,8 @@ ids), and `runFor`: `all` (the default, unless `.peneira/config.json` sets it), 
 | `llm` | The first installed skill in `reviewers.llm.skills` (see [Review skill](#review-skill)). It reviews read-only and does not post. With none installed, a built-in prompt judges the diff against the ticket (fetched from Linear when `LINEAR_API_KEY` is set) and the CLI prints how to install the missing skills. `provider`: `anthropic` or `openai`; `focus` adds project-specific guidance. `transport` defaults to `auto`: the HTTP API when `REVIEW_API_KEY` is set, otherwise the ponytail runner's logged-in CLI. GitHub Actions without that key still skips. | `REVIEW_API_KEY` and a `model` (or `REVIEW_MODEL`) for the backup HTTP prompt. `REVIEW_TRANSPORT` (`auto`, `api`, `agent`) overrides `transport`. |
 | `sarif` | Any tool that emits SARIF: semgrep, CodeQL, eslint... `command` may use `{base}` and `{head}`; `requires` names a binary that must exist; `output` reads a file instead of stdout. | the tool |
 
+The order of `reviewers` is their priority (`llm` before `ponytail` by default; keys from `DEFAULTS` keep that order, extra reviewers come after). Findings are listed in that order within each severity, and when two reviewers flag overlapping lines (±2) of the same file, only the earlier one is kept: it takes the more severe group and names the dropped finding under "Also flagged by".
+
 Use a different model family for `llm` than the one writing the code, so the reviewers do not
 share blind spots. Ponytail's model is `reviewers.ponytail.model` or `PONYTAIL_MODEL`. On the
 agent transport, `reviewers.llm.model` or `REVIEW_MODEL` is passed as `--model` when set.

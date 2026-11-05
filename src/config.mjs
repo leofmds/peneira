@@ -45,13 +45,14 @@ export const DEFAULTS = {
     ],
   },
   findings: { visibility: 'summary' },
+  // Order is priority: findings are shown in this order, and on overlap the earlier reviewer's finding is kept.
   reviewers: {
-    ponytail: { type: 'ponytail', enabled: true, prefix: 'P', runFor: 'all', maxTurns: 40, model: null, runner: 'claude' },
     llm: {
       type: 'llm', enabled: true, prefix: 'A', runFor: 'all',
       provider: 'anthropic', model: null, apiKeyEnv: 'REVIEW_API_KEY', maxDiffChars: 120000, focus: null,
       transport: 'auto', skills: REVIEW_SKILL_NAMES,
     },
+    ponytail: { type: 'ponytail', enabled: true, prefix: 'P', runFor: 'all', maxTurns: 40, model: null, runner: 'claude' },
   },
   triage: { linearTeamKey: null },
 };
