@@ -227,10 +227,3 @@ npm test        # node:test, fixture repos, fake GitHub, fake runner CLIs; no ne
 Layout: `src/commands/*` (CLI commands), `src/reviewers/*` (adapters), `src/policy.mjs` (gate),
 `src/triage.mjs` + `src/publish.mjs` (decisions to GitHub objects), `src/github.mjs` (the only
 module that talks to the platform), `templates/` (what `init` writes).
-
-## Why the name
-
-In the state of Minas Gerais, coffee goes through machines first: harvesters, dryers, hullers.
-Then it goes through the *peneira*, and finally through people who sort the beans by hand
-(*catação*) and taste the cup. Code review with AI works best the same way: let the machines
-do the volume, and keep the judgment human.
