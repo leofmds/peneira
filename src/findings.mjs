@@ -41,6 +41,21 @@ export function sortFindings(list) {
   return [...list].sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group));
 }
 
+/** Merges findings from different reviewers that point at overlapping lines of the same file.
+ * Input order is priority: the earlier finding stays, takes the more severe group, and lists
+ * what it absorbed under "Also flagged by". */
+export function dedupeFindings(list, slack = 2) {
+  const kept = [];
+  for (const f of list) {
+    const dup = f.file && f.line && kept.find((k) => k.source !== f.source && k.file === f.file && k.line
+      && f.line <= (k.endLine || k.line) + slack && k.line <= (f.endLine || f.line) + slack);
+    if (!dup) { kept.push({ ...f, parts: { ...f.parts } }); continue; }
+    if (GROUPS.indexOf(f.group) < GROUPS.indexOf(dup.group)) dup.group = f.group;
+    dup.parts['Also flagged by'] = [dup.parts['Also flagged by'], `${f.source} ${f.id}: ${f.title}`].filter(Boolean).join('; ');
+  }
+  return kept;
+}
+
 // ---------- SARIF ----------
 export function fromSarif(sarif, { source, prefix }) {
   const out = [];
