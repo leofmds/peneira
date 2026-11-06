@@ -119,7 +119,8 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
     if (r.error) io.print(`${c.red('✖')} ${r.name}: failed (${r.error})`);
     else if (r.skipped) io.print(`${c.dim('–')} ${r.name}: skipped (${r.skipped})`);
     else {
-      const who = r.skill ? `${r.name} (${r.skill})` : r.name;
+      // skill is null (not missing) when an llm reviewer fell back to the built-in prompt.
+      const who = r.skill ? `${r.name} (${r.skill})` : r.skill === null ? `${r.name} (built-in)` : r.name;
       io.print(`${c.green('✔')} ${who}: ${r.findings.length} finding(s) ${c.dim(`[${r.origin}]`)}`);
       if (r.suggest && r.origin === 'local') io.print(c.yellow(r.suggest));
     }
@@ -200,6 +201,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   for (const ch of choices) {
     const f = ch.finding;
     decisions[f.fingerprint] = { decision: ch.decision, id: f.id, source: f.source, group: f.group, title: f.title,
+      ...(f.alsoBy ? { alsoBy: f.alsoBy } : {}),
       ...(ch.reason ? { reason: ch.reason } : {}), ...(ch.ticket ? { ticket: ch.ticket } : {}),
       ...(posted && ch.text ? { posted: true } : {}), at: new Date().toISOString() };
   }

@@ -13,6 +13,7 @@ import { readStore, MARKERS, withData } from '../src/store.mjs';
 import { diffIndex } from '../src/diffindex.mjs';
 import { buildPublication } from '../src/publish.mjs';
 import { parseDecisionSpec, applyDecisionSpec } from '../src/triage.mjs';
+import { plannedReviewers } from '../src/reviewers/index.mjs';
 import { fixtureRepo } from './helpers.mjs';
 
 test('PR refs: number, #number, URL; garbage is rejected', () => {
@@ -38,11 +39,11 @@ test('config: repo file overrides defaults, arrays replace', () => {
   assert.deepEqual(cfg.ignore, ['x']);
 });
 
-test('config: skills are opt-in, ~/.peneira/config.json sets them, the repo file replaces them', () => {
+test('config: the bundled skill is the default, ~/.peneira/config.json sets the list, the repo file replaces it', () => {
   const home = mkdtempSync(join(tmpdir(), 'rg-home-'));
   ensureUserConfig({ HOME: home });
   const bare = fixtureRepo();
-  assert.deepEqual(loadConfig(bare.cwd, { HOME: home }).reviewers.llm.skills, []);
+  assert.deepEqual(loadConfig(bare.cwd, { HOME: home }).reviewers.llm.skills, ['high-signal-review']);
   const over = fixtureRepo({ config: { reviewers: { llm: { skills: ['only-repo'] } } } });
   assert.deepEqual(loadConfig(over.cwd, { HOME: home }).reviewers.llm.skills, ['only-repo']);
   const skill = join(bare.cwd, '.agents/skills/code-review/SKILL.md');
@@ -50,6 +51,7 @@ test('config: skills are opt-in, ~/.peneira/config.json sets them, the repo file
   writeFileSync(skill, '---\nname: code-review\n---\n');
   assert.equal(findSkill('code-review', bare.cwd, {}), skill);
   assert.equal(findSkill('missing', bare.cwd, { HOME: home }), null);
+  assert.match(findSkill('high-signal-review', bare.cwd, {}), /templates\/skills\/high-signal-review\/SKILL\.md$/, 'bundled skill needs no install');
   const custom = join(bare.cwd, '.agents/skills/my-review/SKILL.md');
   mkdirSync(join(custom, '..'), { recursive: true });
   writeFileSync(custom, '---\nname: my-review\n---\n');
@@ -151,4 +153,12 @@ test('dedupeFindings: earlier reviewer wins on overlapping lines, keeps the wors
   assert.equal(out[0].group, 'must');
   assert.match(out[0].parts['Also flagged by'], /ponytail P1: Remove manual loop/);
   assert.equal(a.group, 'nice', 'input is not mutated');
+  assert.deepEqual(out[0].alsoBy, ['ponytail'], 'absorbed sources are kept for metrics');
+});
+
+test('plannedReviewers: a reviewer whose prefix is taken uses its own name', () => {
+  const cfg = { reviewers: {
+    llm: { type: 'llm', prefix: 'A' }, builtin: { type: 'llm', prefix: 'A' }, quality: { type: 'llm', prefix: 'Q' }, ponytail: { type: 'ponytail' },
+  } };
+  assert.deepEqual(plannedReviewers(cfg, {}).map((r) => r.conf.prefix), ['A', 'BUILTIN', 'Q', 'P']);
 });

@@ -1,5 +1,6 @@
 // Review metrics: AI-generated vs other merged PRs, and triage outcomes per reviewer.
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { createGitHub, resolveToken, parseRepoFromRemote } from '../github.mjs';
 import { gitSafe } from '../git.mjs';
 import { readStore } from '../store.mjs';
@@ -9,9 +10,10 @@ export async function runMetrics({ argv = [], cwd, env, io, fetchImpl = globalTh
   const days = Number(i >= 0 ? argv[i + 1] : env.DAYS || 14);
   const repo = env.GITHUB_REPOSITORY || parseRepoFromRemote(gitSafe(cwd, 'remote', 'get-url', 'origin'));
   const gh = createGitHub({ token: resolveToken(env), repo, fetchImpl });
-  const merged = await gh.listMergedSince(new Date(Date.now() - days * 864e5));
+  const since = Date.now() - days * 864e5;
+  const merged = await gh.listMergedSince(new Date(since));
 
-  const rows = [], triage = {};
+  const rows = [], decided = new Map();
   for (const p of merged) {
     const [detail, reviews, comments] = await Promise.all([gh.getPr(p.number), gh.listReviews(p.number), gh.listComments(p.number)]);
     const human = reviews.filter((r) => r.user?.type !== 'Bot');
@@ -24,11 +26,24 @@ export async function runMetrics({ argv = [], cwd, env, io, fetchImpl = globalTh
       changeRequests: human.filter((r) => r.state === 'CHANGES_REQUESTED').length,
     });
     for (const decisions of Object.values(readStore(comments).triage)) {
-      for (const d of Object.values(decisions)) {
-        const t = (triage[d.source] ||= { total: 0 });
-        const k = d.decision.startsWith('commented') || d.decision === 'general-note' ? 'posted' : d.decision.startsWith('ticket') ? 'ticket' : d.decision;
-        t.total++; t[k] = (t[k] || 0) + 1;
-      }
+      for (const [fp, d] of Object.entries(decisions)) decided.set(`${p.number}:${fp}`, d);
+    }
+  }
+  // Local triage (.git/peneira/<pr>/triage.json) covers PRs triaged on this machine, merged or not.
+  const root = join(gitSafe(cwd, 'rev-parse', '--absolute-git-dir')?.trim() || '', 'peneira');
+  for (const pr of existsSync(root) ? readdirSync(root) : []) {
+    const file = join(root, pr, 'triage.json');
+    let decisions = {};
+    try { decisions = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}; } catch { /* unreadable: skip */ }
+    for (const [fp, d] of Object.entries(decisions)) if (Date.parse(d.at) >= since) decided.set(`${pr}:${fp}`, d);
+  }
+  // A merged duplicate counts for every reviewer that flagged it, so comparisons stay fair.
+  const triage = {};
+  for (const d of decided.values()) {
+    const k = d.decision.startsWith('commented') || d.decision === 'general-note' ? 'posted' : d.decision.startsWith('ticket') ? 'ticket' : d.decision;
+    for (const source of [d.source, ...(d.alsoBy || [])]) {
+      const t = (triage[source] ||= { total: 0 });
+      t.total++; t[k] = (t[k] || 0) + 1;
     }
   }
 

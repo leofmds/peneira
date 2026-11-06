@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeFinding } from '../findings.mjs';
@@ -12,6 +12,10 @@ export const RUNNERS = {
   cursor: { bin: 'agent', binEnv: 'CURSOR_AGENT_BIN', secret: 'CURSOR_API_KEY', label: 'Cursor agent' },
   codex: { bin: 'codex', binEnv: 'CODEX_BIN', secret: 'CODEX_API_KEY', label: 'Codex' },
 };
+
+// User settings can carry hooks that approve any Bash command (and subagents inherit them), which
+// would make the review able to write. Load only project settings and never skip permission prompts.
+export const READ_ONLY = ['--setting-sources', 'project', '--permission-mode', 'default'];
 
 const SCHEMA = `{
   "what_this_change_does": string,
@@ -30,7 +34,19 @@ function skillSource(cwd) {
   if (existsSync(join(cwd, LEGACY_SKILL))) return { kind: 'repo', path: LEGACY_SKILL };
   const user = join(homedir(), '.claude/skills/ponytail-review/SKILL.md');
   if (existsSync(user)) return { kind: 'user', path: user };
-  if (existsSync(join(homedir(), '.claude/plugins'))) return { kind: 'plugin' };
+  const plugin = pluginSkill();
+  return plugin ? { kind: 'plugin', path: plugin } : null;
+}
+
+// READ_ONLY drops user settings, so the plugin is not loaded: point at its SKILL.md instead.
+// ponytail: newest version by name sort. Ceiling: "4.10" sorts before "4.9". Upgrade: semver compare.
+function pluginSkill() {
+  const ls = (p) => { try { return readdirSync(p).sort().reverse(); } catch { return []; } };
+  const cache = join(homedir(), '.claude/plugins/cache');
+  for (const market of ls(cache)) for (const plugin of ls(join(cache, market))) for (const ver of ls(join(cache, market, plugin))) {
+    const path = join(cache, market, plugin, ver, 'skills/ponytail-review/SKILL.md');
+    if (existsSync(path)) return path;
+  }
   return null;
 }
 
@@ -56,8 +72,7 @@ export function available({ cwd, conf = {}, env = process.env }) {
 }
 
 export function buildPrompt({ src, base, head }) {
-  const how = src.path ? `Read ${src.path} and follow it exactly.` : 'Use the ponytail-review skill and follow it exactly.';
-  return `${how}
+  return `Read ${src.path} and follow it exactly.
 Review the change between ${base} and ${head}: start with \`git diff ${base}...${head}\`,
 then read the code it touches as the skill says. Do not modify any file.
 Only flag code this change adds or modifies. Zero findings is a good answer.
@@ -96,6 +111,7 @@ function argsFor(name, { prompt, conf, cwd, model, outFile }) {
       '-p', prompt,
       '--output-format', 'json',
       '--max-turns', String(conf.maxTurns ?? 40),
+      ...READ_ONLY,
       '--allowedTools', 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*)',
       '--disallowedTools', 'Edit,Write,NotebookEdit',
     ];

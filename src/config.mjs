@@ -49,7 +49,7 @@ export const DEFAULTS = {
     llm: {
       type: 'llm', enabled: true, prefix: 'A', runFor: 'all',
       provider: 'anthropic', model: null, apiKeyEnv: 'REVIEW_API_KEY', maxDiffChars: 120000, focus: null,
-      transport: 'auto', skills: [],
+      transport: 'auto', skills: ['high-signal-review'],
     },
     ponytail: { type: 'ponytail', enabled: true, prefix: 'P', runFor: 'all', maxTurns: 40, model: null, runner: 'claude' },
   },
@@ -79,7 +79,7 @@ export function ensureUserConfig(env = {}) {
   const p = userConfigPath(env);
   if (!p || existsSync(p)) return p;
   mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, `${JSON.stringify({ reviewers: { llm: { skills: [] } } }, null, 2)}\n`);
+  writeFileSync(p, `${JSON.stringify({ reviewers: { llm: { skills: ['high-signal-review'] } } }, null, 2)}\n`);
   return p;
 }
 
