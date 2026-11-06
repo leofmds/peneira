@@ -8,6 +8,7 @@ import { parseRepoFromRemote } from '../src/github.mjs';
 import { loadConfig, DEFAULTS, ensureUserConfig } from '../src/config.mjs';
 import { findSkill, installHint, resolveReviewSkill } from '../src/reviewers/skills.mjs';
 import { runPolicy } from '../src/policy.mjs';
+import { git } from '../src/git.mjs';
 import { makeFinding, fromSarif, toSarif, dedupeFindings } from '../src/findings.mjs';
 import { readStore, MARKERS, withData } from '../src/store.mjs';
 import { diffIndex } from '../src/diffindex.mjs';
@@ -78,6 +79,24 @@ test('policy: classifies files, detects AI, blocks on unjustified dependency and
   assert.ok(r.blocking.some((m) => m.includes('Assumptions')));
   assert.ok(r.blocking.some((m) => m.includes('p-retry')));
   assert.deepEqual(r.labels, ['ai-generated', 'risk:high']);
+});
+
+test('policy: required sections come from the repo PR template, in any heading style', () => {
+  const { cwd, baseSha, headSha } = fixtureRepo();
+  const pr = { baseSha, headSha, title: 'PLAT-482', headRef: 'x', labels: [] };
+  const sectionsMsg = (r) => [...r.blocking, ...r.warnings].find((m) => m.startsWith('PR description'));
+  const missing = (body) => sectionsMsg(runPolicy({ cwd, cfg: loadConfig(cwd), pr: { ...pr, body } }));
+  assert.match(missing(''), /: Intent, Assumptions, Out of scope \/ not done, How it was verified \(from \.github\/pull_request_template\.md\)/);
+  // Bold-line headings count, and a subheading stays inside its section.
+  const body = '# Intent\nwhy\n**Assumptions**\nnone\n## Out of scope / not done\n### Details\nnothing\n## How it was verified\n**Unit tests**\npass';
+  assert.equal(missing(body), undefined);
+
+  const own = fixtureRepo();
+  git(own.cwd, 'checkout', '-q', 'main');
+  writeFileSync(join(own.cwd, '.github/pull_request_template.md'), '### → What this fixes\n<!-- bug or feature -->\n### → Notes\n<!-- Optional -->\n');
+  git(own.cwd, 'commit', '-qam', 'own template');
+  const r = runPolicy({ cwd: own.cwd, cfg: loadConfig(own.cwd), pr: { ...pr, baseSha: git(own.cwd, 'rev-parse', 'HEAD').trim(), headSha: own.headSha, body: '### → What this fixes\nA label bug.' } });
+  assert.equal(sectionsMsg(r), undefined);
 });
 
 test('findings: fingerprint is stable across ids and line moves; SARIF round-trips', () => {

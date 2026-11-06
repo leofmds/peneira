@@ -1,7 +1,7 @@
 // The policy gate: size budget, linked ticket, description sections, dependencies,
 // risk signals and reading order. Pure over (repo, config, PR info): no API calls.
 import { git, gitSafe } from './git.mjs';
-import { matcher, escapeRe } from './util.mjs';
+import { matcher } from './util.mjs';
 import { appliesTo } from './config.mjs';
 
 function numstat(cwd, base, head, extra = []) {
@@ -19,14 +19,38 @@ function numstat(cwd, base, head, extra = []) {
   return files;
 }
 
+// A markdown heading (`#`–`######`) or a line that is only bold text, which ranks below every `#` level.
+function heading(line) {
+  const t = line.trim();
+  const m = t.match(/^(#{1,6})\s+(.+?)(?:\s+#+)?$/) || t.match(/^()\*\*(.+?)\*\*:?$/);
+  return m && { level: m[1].length || 7, text: m[2].trim() };
+}
+
+/** Text under the heading called `name`, up to the next heading of the same or a higher level; null if absent. */
 export function section(body, name) {
   const lines = String(body || '').replace(/<!--[\s\S]*?-->/g, '').split('\n');
-  const head = new RegExp(`^#{2,4}\\s*${escapeRe(name)}\\s*$`, 'i');
-  const start = lines.findIndex((l) => head.test(l.trim()));
+  const start = lines.findIndex((l) => heading(l)?.text.toLowerCase() === name.toLowerCase());
   if (start < 0) return null;
+  const level = heading(lines[start]).level;
   const rest = lines.slice(start + 1);
-  const end = rest.findIndex((l) => /^#{1,4}\s/.test(l.trim()));
+  const end = rest.findIndex((l) => heading(l)?.level <= level);
   return (end < 0 ? rest : rest.slice(0, end)).join('\n').trim();
+}
+
+const PR_TEMPLATE = /^(\.github\/|docs\/)?pull_request_template\.md$/i;
+
+/** Required description sections: the configured list, else the headings of the repo's PR template not marked optional. */
+function requiredSections(cwd, cfg, rev) {
+  if (cfg.templateSections.sections) return { names: cfg.templateSections.sections, from: 'templateSections.sections' };
+  const path = (gitSafe(cwd, 'ls-tree', '--name-only', rev, '--', '.', '.github/', 'docs/') || '').split('\n').find((p) => PR_TEMPLATE.test(p));
+  if (!path) return { names: [] };
+  const found = [];
+  for (const line of git(cwd, 'show', `${rev}:${path}`).split('\n')) {
+    const h = heading(line);
+    if (h) found.push({ name: h.text, text: '' });
+    else if (found.length) found.at(-1).text += `${line}\n`;
+  }
+  return { names: found.filter((s) => !/\b(optional|only if)\b/i.test(s.text)).map((s) => s.name), from: path };
 }
 
 /**
@@ -84,8 +108,9 @@ export function runPolicy({ cwd, cfg, pr }) {
   if (!ticket) fail(cfg.ticket.requiredFor, 'No linked ticket found in title, branch or description.');
 
   // Description sections
-  const missing = cfg.templateSections.sections.filter((s) => !section(pr.body, s));
-  if (missing.length) fail(cfg.templateSections.requiredFor, `PR description is missing or has empty sections: ${missing.join(', ')}.`);
+  const required = requiredSections(cwd, cfg, base);
+  const missing = required.names.filter((s) => !section(pr.body, s));
+  if (missing.length) fail(cfg.templateSections.requiredFor, `PR description is missing or has empty sections: ${missing.join(', ')} (from ${required.from}).`);
 
   // Dependencies
   const depChanges = [];

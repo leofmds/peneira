@@ -10,7 +10,7 @@
      timeouts, tenancy. If an assumption is wrong, what breaks? -->
 
 ## Alternatives considered
-<!-- What else was possible and why it was rejected. -->
+<!-- Optional. What else was possible and why it was rejected. -->
 
 ## Out of scope / not done
 <!-- What this PR deliberately does NOT do. "Nothing" is a valid answer. -->
@@ -24,4 +24,4 @@
      maintenance status, license. Delete this section otherwise. -->
 
 ## Risk & rollback
-<!-- What could go wrong in production and how to roll back (feature flag, revert, down migration). -->
+<!-- Optional. What could go wrong in production and how to roll back (feature flag, revert, down migration). -->

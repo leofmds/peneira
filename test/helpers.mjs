@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { scriptedIO } from '../src/ui.mjs';
@@ -28,6 +28,7 @@ export function fixtureRepo({ config } = {}) {
     'src/util/format.js': 'export function a(x){\n  return x+1\n}\n',
     'src/util/old.js': 'old\n',
     'src/ingestion/worker.js': workerFile(['export const run = () => 1;', '', '', '']),
+    '.github/pull_request_template.md': readFileSync(new URL('../templates/github/pull_request_template.md', import.meta.url), 'utf8'),
     ...(config ? { '.peneira/config.json': JSON.stringify(config) } : {}),
   });
   sh(cwd, 'add', '-A');
