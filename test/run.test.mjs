@@ -249,11 +249,10 @@ else process.stdout.write(JSON.stringify({ result: text }));
     assert.match(result.title, new RegExp(`${runner} / default`));
     assert.equal(argv.includes('--model'), false);
     if (runner === 'claude') {
-      assert.equal(argv[argv.indexOf('--tools') + 1], '');
-      assert.equal(argv[argv.indexOf('--max-turns') + 1], '1');
-      assert.match(argv[argv.indexOf('--system-prompt') + 1], /Report only defects this PR introduces/);
+      assert.equal(argv[argv.indexOf('--allowedTools') + 1].includes('Read'), true, 'can read code outside the diff');
+      assert.match(argv[argv.indexOf('--disallowedTools') + 1], /Edit,Write/);
+      assert.match(argv[argv.indexOf('--append-system-prompt') + 1], /read the code the finding depends on/);
       assert.equal(argv.includes('--bare'), false);
-      assert.equal(argv.includes('--allowedTools'), false);
       assert.match(argv[argv.indexOf('-p') + 1], /## DIFF/);
     } else if (runner === 'cursor') {
       assert.equal(argv[argv.indexOf('--mode') + 1], 'ask');

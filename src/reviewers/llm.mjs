@@ -36,7 +36,11 @@ checker catches, "consider adding tests/docs/logging", refactoring taste or code
 that need inputs you cannot show are possible, or code that is explicitly silenced.
 
 Every finding needs a concrete scenario: which input or state, what happens, why it is wrong.
-If you cannot write that scenario, drop the finding. Look hard at every suspicious change, but
+If you cannot write that scenario, drop the finding.
+Before reporting, read the code the finding depends on, even outside the diff: the definition of
+every function or value it assumes something about, and the callers when you claim one breaks.
+If you cannot read that code, drop the finding, unless it would lose data or open a security
+hole; then say in "unsure" exactly what you could not see. Look hard at every suspicious change, but
 zero findings is a good answer. At most 8 findings, one per root cause.
 Write for a busy reviewer: plain words, short sentences, no hedging, praise or emojis.
 Never say the PR is approved or safe to merge.
@@ -157,13 +161,13 @@ async function call({ provider, model, key, system, user, fetchImpl }) {
 
 function agentArgs(name, { system, user, cwd, model, outFile, skill }) {
   if (name === 'claude') {
-    const args = skill
-      ? ['-p', user, '--output-format', 'json', '--max-turns', '30', '--allowedTools', READ_TOOLS, '--disallowedTools', 'Edit,Write,NotebookEdit']
-      : ['-p', user, '--system-prompt', system, '--tools', '', '--disallowedTools', 'mcp__*', '--max-turns', '1', '--output-format', 'json'];
+    // Read tools on both paths: a finding about a function outside the diff needs its definition.
+    const args = ['-p', user, '--output-format', 'json', '--max-turns', '30', '--allowedTools', READ_TOOLS, '--disallowedTools', 'Edit,Write,NotebookEdit,mcp__*'];
+    if (!skill) args.push('--append-system-prompt', system);
     if (model) args.push('--model', model);
     return args;
   }
-  // ponytail: Cursor ask mode and the Codex read-only sandbox can still read the repo. Ceiling: the prompt already contains the diff. Upgrade: an ACP client that denies every tool call.
+  // Cursor ask mode and the Codex read-only sandbox can read the repo but not change it.
   const prompt = skill ? user : `${system}\n\n${user}`;
   if (name === 'cursor') {
     const args = ['-p', '--mode', 'ask', '--trust', '--output-format', 'json', '--workspace', cwd];
