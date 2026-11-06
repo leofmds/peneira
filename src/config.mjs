@@ -52,6 +52,9 @@ export const DEFAULTS = {
       transport: 'auto', skills: ['high-signal-review'],
     },
     ponytail: { type: 'ponytail', enabled: true, prefix: 'P', runFor: 'all', maxTurns: 40, model: null, runner: 'claude' },
+    // compare: true reviewers run only with --compare, to measure them against llm in `peneira metrics`.
+    builtin: { type: 'llm', compare: true, prefix: 'B', skills: [] },
+    quality: { type: 'llm', compare: true, prefix: 'Q', skills: ['code-review-and-quality'] },
   },
   triage: { linearTeamKey: null },
 };

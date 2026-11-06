@@ -10,9 +10,9 @@ export const TYPES = { ponytail, llm, sarif };
 
 const DEFAULT_PREFIX = { llm: 'A', ponytail: 'P', sarif: 'S' };
 
-export function plannedReviewers(cfg, report, only = null) {
+export function plannedReviewers(cfg, report, only = null, compare = false) {
   const planned = Object.entries(cfg.reviewers || {})
-    .filter(([name, conf]) => conf && conf.enabled !== false && (!only || only.includes(name)))
+    .filter(([name, conf]) => conf && conf.enabled !== false && (only ? only.includes(name) : compare || !conf.compare))
     .map(([name, conf]) => ({
       name, conf, adapter: TYPES[conf.type || name],
       applies: !!only || appliesTo(conf.runFor || 'all', report),

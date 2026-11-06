@@ -97,6 +97,7 @@ only gets what has no place in the code.
 ```
 --fresh            ignore CI results and the cache; run every reviewer locally
 --only a,b         only these reviewers
+--compare          also run the comparison reviewers (see Comparing reviewers)
 --all              include findings triaged before, except already posted ones
 --guide            print the full Review guide
 --list [--json]    print findings and exit
@@ -210,13 +211,15 @@ Skills need tools, so they only run on the agent transport. The HTTP API (`REVIE
 
 ### Comparing reviewers
 
-Any number of `llm` reviewers can run on the same PR. Give each one a name and a skill list:
+By default a run uses `llm` (the `high-signal-review` skill) and `ponytail`. Add `--compare` to also run the comparison reviewers on the same PR:
+
+- `builtin`: the built-in prompt (ids `B1`, `B2`…).
+- `quality`: the `code-review-and-quality` skill (ids `Q1`…).
+
+A reviewer with `"compare": true` runs only with `--compare` (or when named in `--only`). Add your own the same way:
 
 ```json
-{ "reviewers": {
-    "llm": { "skills": ["high-signal-review"] },
-    "builtin": { "type": "llm", "skills": [], "prefix": "B" },
-    "quality": { "type": "llm", "skills": ["code-review-and-quality"], "prefix": "Q" } } }
+{ "reviewers": { "judge": { "type": "llm", "compare": true, "skills": ["the-judge"], "prefix": "J" } } }
 ```
 
 Each reviewer gets its own finding ids. If a prefix is taken, the reviewer's name becomes its prefix (`QUALITY1`). After a few weeks of triage, `peneira metrics` shows each reviewer's posted, ignored and false-positive rates. A finding that several reviewers flagged counts for each of them.

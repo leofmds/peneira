@@ -23,6 +23,7 @@ export const RUN_HELP = `Usage: peneira [pr] [options]
 Options:
   --fresh            Ignore CI results and the local cache; run every reviewer locally.
   --only a,b         Run/triage only these reviewers (names from .peneira/config.json).
+  --compare          Also run the comparison reviewers (builtin, quality); see \`peneira metrics\`.
   --all              Show findings already triaged before, except those already posted.
   --guide            Print the full Review guide (reading order).
   --list             Print the findings and exit (add --json for machine output).
@@ -32,7 +33,7 @@ Options:
   --repo owner/name  Override the repo inferred from the origin remote.`;
 
 export function parseRunArgs(argv) {
-  const o = { ref: null, only: null, fresh: false, all: false, guide: false, list: false, json: false,
+  const o = { ref: null, only: null, compare: false, fresh: false, all: false, guide: false, list: false, json: false,
     decide: null, submit: null, dryRun: false, repo: null, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -43,6 +44,7 @@ export function parseRunArgs(argv) {
     else if (a === '--list') o.list = true;
     else if (a === '--json') o.json = true;
     else if (a === '--dry-run') o.dryRun = true;
+    else if (a === '--compare') o.compare = true;
     else if (a === '--only') o.only = val().split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--decide') o.decide = val();
     else if (a === '--submit') o.submit = val();
@@ -99,7 +101,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   // 3. Reviewers: reuse CI data for this head, then local cache, else run locally (in parallel)
   const comments = await gh.listComments(pr.number);
   const store = readStore(comments);
-  const planned = plannedReviewers(cfg, report, o.only);
+  const planned = plannedReviewers(cfg, report, o.only, o.compare);
   if (!planned.length) io.print(c.dim('No reviewers apply to this PR.'));
   const running = planned.filter((r) => o.fresh || !(store.reviewers[r.name]?.headSha === head && store.reviewers[r.name]?.findings)
     && !readCache(cachePath(cwd, pr, r.name)));

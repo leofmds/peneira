@@ -17,7 +17,7 @@ const output = (env, k, v) => env.GITHUB_OUTPUT && appendFileSync(env.GITHUB_OUT
 export async function runCi({ argv, cwd, env, io, fetchImpl = globalThis.fetch }) {
   const [step, ...rest] = argv;
   if (step === 'metrics') return (await import('./metrics.mjs')).runMetrics({ argv: rest, cwd, env, io, fetchImpl });
-  if (!['policy', 'reviewers'].includes(step)) throw new Error('Usage: peneira ci policy | reviewers [--only a,b] | metrics');
+  if (!['policy', 'reviewers'].includes(step)) throw new Error('Usage: peneira ci policy | reviewers [--only a,b] [--compare] | metrics');
 
   const cfg = loadConfig(cwd);
   const pr = ciPrFromEvent(env);
@@ -40,7 +40,7 @@ export async function runCi({ argv, cwd, env, io, fetchImpl = globalThis.fetch }
   // reviewers
   const i = rest.indexOf('--only');
   const only = i >= 0 ? rest[i + 1].split(',') : null;
-  const planned = plannedReviewers(cfg, report, only);
+  const planned = plannedReviewers(cfg, report, only, rest.includes('--compare'));
   const visibility = cfg.findings?.visibility || 'summary';
   const comments = await gh.listComments(pr.number);
   const results = await Promise.all(planned.map((r) => runReviewer(r, { cwd, base, head, pr, report, cfg, env, fetchImpl })));

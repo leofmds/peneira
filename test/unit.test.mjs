@@ -162,3 +162,10 @@ test('plannedReviewers: a reviewer whose prefix is taken uses its own name', () 
   } };
   assert.deepEqual(plannedReviewers(cfg, {}).map((r) => r.conf.prefix), ['A', 'BUILTIN', 'Q', 'P']);
 });
+
+test('plannedReviewers: compare reviewers run only with --compare or --only', () => {
+  const cfg = { reviewers: { llm: { type: 'llm' }, quality: { type: 'llm', compare: true } } };
+  assert.deepEqual(plannedReviewers(cfg, {}).map((r) => r.name), ['llm']);
+  assert.deepEqual(plannedReviewers(cfg, {}, null, true).map((r) => r.name), ['llm', 'quality']);
+  assert.deepEqual(plannedReviewers(cfg, {}, ['quality']).map((r) => r.name), ['quality']);
+});
