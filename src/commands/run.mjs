@@ -84,6 +84,7 @@ export async function runReview({ argv = [], cwd = process.cwd(), env = process.
   // 1. PR
   const pr = await resolvePr({ gh, ref: o.ref, cwd });
   io.print(`${c.bold(`PR #${pr.number}`)} ${pr.title}  ${c.dim(`@${pr.author} · head ${pr.headSha.slice(0, 7)}`)}`);
+  io.print(`   ${c.cyan(pr.url)}`);
   if (!ensureCommits(cwd, pr)) throw new Error(`Could not get the PR commits locally (git fetch origin pull/${pr.number}/head). Is this the right repo?`);
   const base = mergeBase(cwd, pr), head = pr.headSha;
 
