@@ -6,8 +6,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "peneira": "bin/peneira.mjs",
-    "review": "bin/peneira.mjs"
+    "peneira": "bin/peneira.mjs"
   },
   "files": [
     "bin",

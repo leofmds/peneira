@@ -10,8 +10,6 @@ const HELP = `peneira: gate, review and triage pull requests. You decide what ge
   peneira metrics [--days N]   Review metrics for the repo
   peneira --version
 
-  \`review\` is installed as an alias of \`peneira\`.
-
 ${RUN_HELP}`;
 
 export async function main(argv, { io = terminalIO(), env = process.env, cwd = process.cwd(), fetchImpl = globalThis.fetch } = {}) {
