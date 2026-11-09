@@ -38,7 +38,7 @@ npm i -g github:leofmds/peneira     # or: git clone https://github.com/leofmds/p
 peneira --version
 ```
 
-Installs two commands: `peneira` and its short alias `review`.
+Installs one command: `peneira`.
 
 Requires Node 20+, git, and a GitHub token (`GITHUB_TOKEN`, or just `gh auth login`).
 No runtime dependencies.
