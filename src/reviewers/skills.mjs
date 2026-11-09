@@ -1,9 +1,13 @@
-// Default review skills, ranked by skills.sh installs and repo stars (late 2026).
-// The first one installed is the reviewer. The built-in prompt is the backup.
+// Review skills for reviewers.llm.skills. high-signal-review ships with peneira (templates/skills);
+// the others are known installs, ranked by skills.sh installs and repo stars (late 2026).
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const BUNDLED = join(dirname(fileURLToPath(import.meta.url)), '../../templates/skills');
 
 export const REVIEW_SKILLS = [
+  { name: 'high-signal-review', repo: 'anthropics/claude-plugins-official (bundled)', install: 'ships with peneira' },
   {
     name: 'code-review',
     repo: 'mattpocock/skills',
@@ -21,8 +25,6 @@ export const REVIEW_SKILLS = [
   },
 ];
 
-export const REVIEW_SKILL_NAMES = REVIEW_SKILLS.map((s) => s.name);
-
 const SKILL_DIRS = ['.agents/skills', '.claude/skills', '.cursor/skills'];
 
 export function findSkill(name, cwd, env = {}) {
@@ -33,7 +35,8 @@ export function findSkill(name, cwd, env = {}) {
       if (existsSync(path)) return path;
     }
   }
-  return null;
+  const bundled = join(BUNDLED, name, 'SKILL.md');
+  return existsSync(bundled) ? bundled : null;
 }
 
 /** First installed skill in list order. ponytail: one skill per run. Ceiling: the rest never run. Upgrade: one pass per installed skill. */

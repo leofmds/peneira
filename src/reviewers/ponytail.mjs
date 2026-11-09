@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { makeFinding } from '../findings.mjs';
@@ -13,6 +13,10 @@ export const RUNNERS = {
   codex: { bin: 'codex', binEnv: 'CODEX_BIN', secret: 'CODEX_API_KEY', label: 'Codex' },
 };
 
+// User settings can carry hooks that approve any Bash command (and subagents inherit them), which
+// would make the review able to write. Load only project settings and never skip permission prompts.
+export const READ_ONLY = ['--setting-sources', 'project', '--permission-mode', 'default'];
+
 const SCHEMA = `{
   "what_this_change_does": string,
   "verdict": string,
@@ -20,15 +24,29 @@ const SCHEMA = `{
   "not_checked": string | null,
   "findings": [ { "number": number, "group": "must" | "should" | "nice", "title": string,
     "file": string | null, "line_start": number | null, "line_end": number | null,
-    "what_this_is": string, "problem": string, "fix": string, "if_we_skip_it": string } ]
-}`;
+    "problem": string, "fix": string } ]
+}
+title: 8 words or fewer, names what to cut. problem: one sentence, what is unnecessary and why.
+fix: one sentence, what replaces it.`;
 
 function skillSource(cwd) {
   if (existsSync(join(cwd, REPO_SKILL))) return { kind: 'repo', path: REPO_SKILL };
   if (existsSync(join(cwd, LEGACY_SKILL))) return { kind: 'repo', path: LEGACY_SKILL };
   const user = join(homedir(), '.claude/skills/ponytail-review/SKILL.md');
   if (existsSync(user)) return { kind: 'user', path: user };
-  if (existsSync(join(homedir(), '.claude/plugins'))) return { kind: 'plugin' };
+  const plugin = pluginSkill();
+  return plugin ? { kind: 'plugin', path: plugin } : null;
+}
+
+// READ_ONLY drops user settings, so the plugin is not loaded: point at its SKILL.md instead.
+// ponytail: newest version by name sort. Ceiling: "4.10" sorts before "4.9". Upgrade: semver compare.
+function pluginSkill() {
+  const ls = (p) => { try { return readdirSync(p).sort().reverse(); } catch { return []; } };
+  const cache = join(homedir(), '.claude/plugins/cache');
+  for (const market of ls(cache)) for (const plugin of ls(join(cache, market))) for (const ver of ls(join(cache, market, plugin))) {
+    const path = join(cache, market, plugin, ver, 'skills/ponytail-review/SKILL.md');
+    if (existsSync(path)) return path;
+  }
   return null;
 }
 
@@ -54,12 +72,12 @@ export function available({ cwd, conf = {}, env = process.env }) {
 }
 
 export function buildPrompt({ src, base, head }) {
-  const how = src.path ? `Read ${src.path} and follow it exactly.` : 'Use the ponytail-review skill and follow it exactly.';
-  return `${how}
+  return `Read ${src.path} and follow it exactly.
 Review the change between ${base} and ${head}: start with \`git diff ${base}...${head}\`,
 then read the code it touches as the skill says. Do not modify any file.
+Only flag code this change adds or modifies. Zero findings is a good answer.
 
-Write the full report exactly as the skill's Output section describes.
+Write the report in the format the skill describes.
 After the report, append ONE fenced \`\`\`json block containing the same findings, with the
 same numbers, matching this shape (group: must = Must fix, should = Should fix, nice = Nice to have;
 line numbers refer to the NEW version of the file):
@@ -78,7 +96,7 @@ export function parse(text, { prefix, source }) {
     file: f.file,
     line: f.line_start,
     endLine: f.line_end,
-    parts: { 'What this is': f.what_this_is, Problem: f.problem, Fix: f.fix, 'If we skip it': f.if_we_skip_it },
+    parts: { Problem: f.problem, Fix: f.fix },
   }));
   const intro = [
     data.what_this_change_does && `**What this change does:** ${data.what_this_change_does}`,
@@ -93,6 +111,7 @@ function argsFor(name, { prompt, conf, cwd, model, outFile }) {
       '-p', prompt,
       '--output-format', 'json',
       '--max-turns', String(conf.maxTurns ?? 40),
+      ...READ_ONLY,
       '--allowedTools', 'Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git grep:*)',
       '--disallowedTools', 'Edit,Write,NotebookEdit',
     ];

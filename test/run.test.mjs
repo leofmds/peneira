@@ -13,10 +13,13 @@ import { fixtureRepo, fakeGitHub, fakeClaude, withSkill, scriptedIO, PONYTAIL_FI
 
 const LLM_RESULT = {
   intent_match: { status: 'partial', notes: 'no dedupe on insert' },
-  out_of_scope_files: [{ file: 'src/util/renamed.js', reason: 'Rename unrelated to PLAT-482.' }],
-  unstated_assumptions: [], questions_for_author: [],
-  findings: [{ severity: 'major', category: 'idempotency', file: 'src/ingestion/worker.js', line: 3, issue: 'No dedupe key check.', suggestion: 'Check dedupe_key.' }],
-  tests: { covers_spec: true, notes: '' },
+  questions_for_author: [],
+  findings: [
+    { group: 'should', title: 'No dedupe key check', file: 'src/ingestion/worker.js', line_start: 3, line_end: null,
+      happens: 'No dedupe key check. A redelivered batch is inserted twice.', evidence: 'db.insert(batch)', fix: 'Check dedupe_key.', unsure: null },
+    { group: 'should', title: 'Unrelated rename', file: 'src/util/renamed.js', line_start: null, line_end: null,
+      happens: 'Rename unrelated to PLAT-482.', evidence: 'git mv', fix: 'Move it to its own PR.', unsure: null },
+  ],
 };
 
 function setup({ comments = [], llm = true } = {}) {
@@ -159,7 +162,7 @@ test('--list --json gives the /pr-review command everything it needs', withFetch
   assert.equal(json.pr.number, 7);
   assert.equal(json.gate.status, 'blocked');
   assert.deepEqual(json.findings.map((f) => f.id), ['P1', 'P2', 'P3', 'P4']);
-  assert.deepEqual(Object.keys(json.findings[0].parts), ['What this is', 'Problem', 'Fix', 'If we skip it']);
+  assert.deepEqual(Object.keys(json.findings[0].parts), ['Problem', 'Fix']);
 }));
 
 test('each runner: read-only flag, and its output becomes findings', async () => {
@@ -246,11 +249,10 @@ else process.stdout.write(JSON.stringify({ result: text }));
     assert.match(result.title, new RegExp(`${runner} / default`));
     assert.equal(argv.includes('--model'), false);
     if (runner === 'claude') {
-      assert.equal(argv[argv.indexOf('--tools') + 1], '');
-      assert.equal(argv[argv.indexOf('--max-turns') + 1], '1');
-      assert.match(argv[argv.indexOf('--system-prompt') + 1], /principal engineer/);
+      assert.equal(argv[argv.indexOf('--allowedTools') + 1].includes('Read'), true, 'can read code outside the diff');
+      assert.match(argv[argv.indexOf('--disallowedTools') + 1], /Edit,Write/);
+      assert.match(argv[argv.indexOf('--append-system-prompt') + 1], /read the code the finding depends on/);
       assert.equal(argv.includes('--bare'), false);
-      assert.equal(argv.includes('--allowedTools'), false);
       assert.match(argv[argv.indexOf('-p') + 1], /## DIFF/);
     } else if (runner === 'cursor') {
       assert.equal(argv[argv.indexOf('--mode') + 1], 'ask');
@@ -305,7 +307,7 @@ process.stdout.write(JSON.stringify({ result: ${JSON.stringify(payload)} }));
   let fetches = 0;
   const result = await llm.run({
     name: 'llm', cwd, base: 'a', head: 'b', pr: { title: 't', body: '' }, report: { readingOrder: [] },
-    conf: { runner: 'claude', prefix: 'A', skills: ['code-review', 'requesting-code-review'], transport: 'auto' },
+    conf: { runner: 'claude', prefix: 'A', skills: ['code-review', 'requesting-code-review'], transport: 'agent' },
     env: { CLAUDE_BIN: bin, REVIEW_API_KEY: 'k', PATH: process.env.PATH },
     fetchImpl: async () => { fetches += 1; throw new Error('http'); },
   });
@@ -318,4 +320,28 @@ process.stdout.write(JSON.stringify({ result: ${JSON.stringify(payload)} }));
   assert.equal(argv[argv.indexOf('--allowedTools') + 1].includes('Bash(git diff:*)'), true);
   assert.match(argv[argv.indexOf('-p') + 1], new RegExp(skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(argv[argv.indexOf('-p') + 1], /Do not post to GitHub/);
+  assert.match(argv[argv.indexOf('-p') + 1], /These constraints override the skill/);
+  assert.doesNotMatch(argv[argv.indexOf('-p') + 1], /Report only defects this PR introduces/, 'the skill decides what to report');
+  assert.equal(argv[argv.indexOf('--setting-sources') + 1], 'project', 'user hooks cannot approve writes');
+  assert.equal(argv[argv.indexOf('--permission-mode') + 1], 'default');
+  assert.match(argv[argv.indexOf('--allowedTools') + 1], /\bAgent\b/);
+});
+
+test('metrics: counts local triage decisions per reviewer, crediting merged duplicates to each source', async () => {
+  const repo = fixtureRepo();
+  const dir = join(gitDir(repo.cwd), 'peneira', '7');
+  mkdirSync(dir, { recursive: true });
+  const at = new Date().toISOString();
+  writeFileSync(join(dir, 'triage.json'), JSON.stringify({
+    f1: { decision: 'false-positive', source: 'llm', alsoBy: ['quality'], at },
+    f2: { decision: 'commented', source: 'quality', posted: true, at },
+    old: { decision: 'ignored', source: 'llm', at: '2020-01-01T00:00:00Z' },
+  }));
+  const gh = fakeGitHub({ baseSha: repo.baseSha, headSha: repo.headSha });
+  const io = scriptedIO([]);
+  const code = await main(['metrics', '--days', '14'], { io, env: { GITHUB_TOKEN: 't', GITHUB_REPOSITORY: 'o/r' }, cwd: repo.cwd, fetchImpl: gh.fetchImpl });
+  assert.equal(code, 0, io.log.join('\n'));
+  const out = io.log.join('\n');
+  assert.match(out, /\| llm \| 1 \| 0% \| 0% \| 0% \| 100% \|/);
+  assert.match(out, /\| quality \| 2 \| 50% \| 0% \| 0% \| 50% \|/);
 });

@@ -43,7 +43,7 @@ export function sortFindings(list) {
 
 /** Merges findings from different reviewers that point at overlapping lines of the same file.
  * Input order is priority: the earlier finding stays, takes the more severe group, and lists
- * what it absorbed under "Also flagged by". */
+ * what it absorbed under "Also flagged by" (and their sources in `alsoBy`, for metrics). */
 export function dedupeFindings(list, slack = 2) {
   const kept = [];
   for (const f of list) {
@@ -52,6 +52,7 @@ export function dedupeFindings(list, slack = 2) {
     if (!dup) { kept.push({ ...f, parts: { ...f.parts } }); continue; }
     if (GROUPS.indexOf(f.group) < GROUPS.indexOf(dup.group)) dup.group = f.group;
     dup.parts['Also flagged by'] = [dup.parts['Also flagged by'], `${f.source} ${f.id}: ${f.title}`].filter(Boolean).join('; ');
+    dup.alsoBy = [...(dup.alsoBy || []), f.source];
   }
   return kept;
 }

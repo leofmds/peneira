@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { deepMerge } from './util.mjs';
-import { REVIEW_SKILL_NAMES } from './reviewers/skills.mjs';
 
 export const CONFIG_PATH = '.peneira/config.json';
 
@@ -50,9 +49,12 @@ export const DEFAULTS = {
     llm: {
       type: 'llm', enabled: true, prefix: 'A', runFor: 'all',
       provider: 'anthropic', model: null, apiKeyEnv: 'REVIEW_API_KEY', maxDiffChars: 120000, focus: null,
-      transport: 'auto', skills: REVIEW_SKILL_NAMES,
+      transport: 'auto', skills: ['high-signal-review'],
     },
     ponytail: { type: 'ponytail', enabled: true, prefix: 'P', runFor: 'all', maxTurns: 40, model: null, runner: 'claude' },
+    // compare: true reviewers run only with --compare, to measure them against llm in `peneira metrics`.
+    builtin: { type: 'llm', compare: true, prefix: 'B', skills: [] },
+    quality: { type: 'llm', compare: true, prefix: 'Q', skills: ['code-review-and-quality'] },
   },
   triage: { linearTeamKey: null },
 };
@@ -80,7 +82,7 @@ export function ensureUserConfig(env = {}) {
   const p = userConfigPath(env);
   if (!p || existsSync(p)) return p;
   mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, `${JSON.stringify({ reviewers: { llm: { skills: REVIEW_SKILL_NAMES } } }, null, 2)}\n`);
+  writeFileSync(p, `${JSON.stringify({ reviewers: { llm: { skills: ['high-signal-review'] } } }, null, 2)}\n`);
   return p;
 }
 

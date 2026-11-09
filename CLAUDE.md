@@ -34,12 +34,13 @@ Key contracts:
 - **Finding** (`findings.mjs` `makeFinding`): `{id, source, group: must|should|nice, title, file, line, endLine, parts, fingerprint}`. Fields follow SARIF. The fingerprint is `source|file|normalized title`, and it is how earlier triage decisions are matched across runs.
 - **Reviewer adapter** (`reviewers/*.mjs`): exports `available(ctx) → {ok, reason}` and `run(ctx) → {title, intro?, findings, meta?}`. Register it in `TYPES` in `reviewers/index.mjs`. `runReviewer` never throws; failures come back as `{error}`/`{skipped}`.
   - `ponytail`: runs the ponytail-review skill headless through the `claude`/`cursor`/`codex` CLI (`PENEIRA_RUNNER`), read-only.
-  - `llm`: the first installed skill from `reviewers.llm.skills` (`skills.mjs` searches `.agents/.claude/.cursor/skills` in the repo, then in `$HOME`). If none is installed, it uses a built-in prompt over the HTTP API or the agent CLI.
+  - `llm`: on the agent transport, the first skill found from `reviewers.llm.skills` (`skills.mjs` searches `.agents/.claude/.cursor/skills` in the repo, then in `$HOME`, then the bundled `templates/skills/`; the default is `high-signal-review`). The skill owns the review method and peneira's prompt owns only the contract (headless, read-only, JSON shape). On the HTTP API, or when no skill is found, it uses the built-in prompt.
+  - Claude runs pass `READ_ONLY` (`--setting-sources project --permission-mode default`), because user hooks can approve any Bash command, subagents included. Keep it on every `claude` invocation.
   - `sarif`: any SARIF-emitting command.
 - **PR state store** (`store.mjs`): CI persists reviewer results in sticky issue comments with `<!-- peneira:reviewer:NAME -->` markers and a base64 `<!-- peneira:data ... -->` block. Only this module knows the marker formats.
 - **Config** (`config.mjs`): `DEFAULTS` → `~/.peneira/config.json` → `.peneira/config.json`. Objects deep-merge and arrays replace. Scope values `all|ai|ai-or-risk|none` go through `appliesTo`.
 
-`templates/` holds what `peneira init` writes into *target* repos (AGENTS.md, slash commands, workflows, presets). It is not config for this repo. `action.yml` is the composite GitHub Action those workflows call.
+`templates/` holds what `peneira init` writes into *target* repos (AGENTS.md, slash commands, workflows, presets). It is not config for this repo. `templates/skills/` is the exception: skills peneira bundles and reads in place. `action.yml` is the composite GitHub Action those workflows call.
 
 ## Tests
 
