@@ -20,7 +20,7 @@ export const DEFAULTS = {
   },
   templateSections: {
     requiredFor: 'ai',
-    sections: ['Intent', 'Assumptions', 'Out of scope / not done', 'How it was verified'],
+    sections: null, // null: the headings of the repo's PR template
   },
   ignore: [
     '**/package-lock.json', '**/pnpm-lock.yaml', '**/yarn.lock', '**/*.snap',

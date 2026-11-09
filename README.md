@@ -180,7 +180,7 @@ Most-used keys:
 |---|---|
 | `budget.maxLogicLines` / `maxFiles` / `blockingFor` | 400 / 10 / `ai` |
 | `ticket.pattern` / `requiredFor` / `urlTemplate` | `ABC-123` style / `ai` / none (`https://linear.app/x/issue/{id}`) |
-| `templateSections.sections` / `requiredFor` | Intent, Assumptions, Out of scope / not done, How it was verified / `ai` |
+| `templateSections.sections` / `requiredFor` | the repo's PR template headings, except ones it marks optional or "only if" / `ai` |
 | `risk.paths` / `risk.addedLinePatterns` | auth, billing, migrations... / DDL, deletes, secrets, eval |
 | `ignore`, `categories.foundation`, `categories.tests` | lockfiles and generated / schemas, migrations, types, config / test globs |
 | `findings.visibility` | `summary`: the author sees counts until you triage. `full`: everyone sees all findings |
