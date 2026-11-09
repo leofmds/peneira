@@ -14,6 +14,7 @@ import { diffIndex } from '../src/diffindex.mjs';
 import { buildPublication } from '../src/publish.mjs';
 import { parseDecisionSpec, applyDecisionSpec } from '../src/triage.mjs';
 import { plannedReviewers } from '../src/reviewers/index.mjs';
+import { available as llmAvailable } from '../src/reviewers/llm.mjs';
 import { fixtureRepo } from './helpers.mjs';
 
 test('PR refs: number, #number, URL; garbage is rejected', () => {
@@ -168,4 +169,12 @@ test('plannedReviewers: compare reviewers run only with --compare or --only', ()
   assert.deepEqual(plannedReviewers(cfg, {}).map((r) => r.name), ['llm']);
   assert.deepEqual(plannedReviewers(cfg, {}, null, true).map((r) => r.name), ['llm', 'quality']);
   assert.deepEqual(plannedReviewers(cfg, {}, ['quality']).map((r) => r.name), ['quality']);
+});
+
+test('llm available: a compare reviewer without its skill is skipped, not run on the built-in prompt', () => {
+  const { cwd } = fixtureRepo();
+  const env = { REVIEW_API_KEY: 'k', HOME: cwd };
+  assert.match(llmAvailable({ cwd, env, conf: { compare: true, skills: ['nope'], transport: 'agent' } }).reason, /skill not found: nope/);
+  assert.match(llmAvailable({ cwd, env, conf: { compare: true, skills: ['high-signal-review'], transport: 'api', model: 'm' } }).reason, /HTTP API/);
+  assert.equal(llmAvailable({ cwd, env, conf: { compare: true, skills: [], transport: 'api', model: 'm' } }).ok, true, 'builtin still runs');
 });

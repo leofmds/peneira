@@ -120,10 +120,15 @@ function agentAvailable(conf, cfg, env) {
   return { ok: true };
 }
 
-export function available({ conf = {}, cfg = {}, env = process.env }) {
+/** @param {{conf?: {compare?: boolean, skills?: string[], [k: string]: any}, cfg?: object, cwd?: string, env?: Record<string, string>}} ctx */
+export function available({ conf = {}, cfg = {}, cwd = process.cwd(), env = process.env }) {
   let transport;
   try { transport = resolveTransport(conf, env); }
   catch (e) { return { ok: false, reason: e.message }; }
+  // A comparison reviewer measures its skill; on the built-in prompt it would only repeat `builtin`.
+  if (conf.compare && conf.skills?.length && (transport === 'api' || !resolveReviewSkill(conf.skills, cwd, env))) {
+    return { ok: false, reason: transport === 'api' ? 'the HTTP API runs no skills' : `skill not found: ${conf.skills.join(', ')}` };
+  }
   return transport === 'api' ? apiAvailable(conf, env) : agentAvailable(conf, cfg, env);
 }
 

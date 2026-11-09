@@ -216,7 +216,7 @@ By default a run uses `llm` (the `high-signal-review` skill) and `ponytail`. Add
 - `builtin`: the built-in prompt (ids `B1`, `B2`…).
 - `quality`: the `code-review-and-quality` skill (ids `Q1`…).
 
-A reviewer with `"compare": true` runs only with `--compare` (or when named in `--only`). Add your own the same way:
+A reviewer with `"compare": true` runs only with `--compare` (or when named in `--only`). If its skill is not found, or on the HTTP API, it is skipped instead of falling back to the built-in prompt. Add your own the same way:
 
 ```json
 { "reviewers": { "judge": { "type": "llm", "compare": true, "skills": ["the-judge"], "prefix": "J" } } }
