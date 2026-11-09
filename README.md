@@ -252,3 +252,9 @@ Layout:
 `src/triage.mjs` + `src/publish.mjs` (decisions to GitHub objects),  
 `src/github.mjs` (the only module that talks to the platform),  
 `templates/` (what `init` writes).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE). The bundled `templates/skills/high-signal-review` skill is Apache-2.0 (see its LICENSE).

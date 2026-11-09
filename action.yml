@@ -1,5 +1,9 @@
 name: peneira
 description: Gate, review and store findings for human triage. Humans decide what gets posted.
+author: Leonardo Ferreira Monteiro da Silva
+branding:
+  icon: filter
+  color: orange
 inputs:
   step:
     description: policy | reviewers | metrics
