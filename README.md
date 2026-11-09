@@ -14,6 +14,7 @@ author sees. Every posted comment is a human decision.
 
 ```
 ✔ PR #14 "PLAT-482 Dedupe events on retry"  @claude-bot · head c6e7654
+   https://github.com/acme/api/pull/14
 ● Gate: warnings · 212 logic lines / 6 files · AI-generated · risk: high
 ✔ ponytail: 3 finding(s) [CI]
 ✔ llm: 4 finding(s) [local]

@@ -119,6 +119,7 @@ test('no PR number: resolves the open PR of the current branch', withFetch(async
   const io = scriptedIO([]);
   await s.run(['--list', '--only', 'ponytail'], io);
   assert.ok(io.log[0].startsWith('PR #7'), io.log[0]);
+  assert.equal(io.log[1], '   https://github.com/o/r/pull/7');
 }));
 
 test('without a terminal and without --decide it explains what to do', withFetch(async (s) => {
