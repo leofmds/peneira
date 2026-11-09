@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`peneira` is a Node 20+ CLI (plain ESM `.mjs`, **zero runtime dependencies**, no build step) that runs AI/static reviewers on a GitHub PR, lets a human triage each finding, and posts only the chosen ones as one GitHub review. `README.md` is the user-facing spec. Keep it in sync when behavior, flags, config keys or env vars change.
+`peneira` is a Node 22+ CLI (plain ESM `.mjs`, **zero runtime dependencies**, no build step) that runs AI/static reviewers on a GitHub PR, lets a human triage each finding, and posts only the chosen ones as one GitHub review. `README.md` is the user-facing spec. Keep it in sync when behavior, flags, config keys or env vars change.
 
 ## Commands
 

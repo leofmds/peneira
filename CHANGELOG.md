@@ -12,6 +12,7 @@ while on 0.x, minor versions may change the CLI or config.
 
 ## Unreleased
 
+- Requires Node 22+ (Node 20 is end of life). CI tests Node 22 and 24.
 - Run ponytail through Claude Code, the Cursor agent CLI or Codex (`reviewers.ponytail.runner`, `PENEIRA_RUNNER`).
 - New `llm` reviewer with HTTP API and agent transports. On the agent transport it runs the
   first installed review skill and falls back to the bundled `high-signal-review` skill.
