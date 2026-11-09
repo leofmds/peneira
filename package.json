@@ -16,7 +16,7 @@
     "README.md"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
@@ -42,7 +42,7 @@
     "human-in-the-loop"
   ],
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.20.5",
     "typescript": "^7.0.2"
   }
 }

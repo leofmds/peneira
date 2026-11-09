@@ -40,7 +40,7 @@ peneira --version
 
 Installs one command: `peneira`.
 
-Requires Node 20+, git, and a GitHub token (`GITHUB_TOKEN`, or just `gh auth login`).
+Requires Node 22+, git, and a GitHub token (`GITHUB_TOKEN`, or just `gh auth login`).
 No runtime dependencies.
 
 ## Quick start
