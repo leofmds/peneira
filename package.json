@@ -1,7 +1,7 @@
 {
   "name": "peneira",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Sift AI code review findings: AI finds the issues, you decide what ships.",
   "license": "MIT",
   "type": "module",
