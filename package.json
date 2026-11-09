@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Sift AI code review findings: AI finds the issues, you decide what ships.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "peneira": "bin/peneira.mjs",
