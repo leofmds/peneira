@@ -34,11 +34,11 @@ Retries insert duplicates
 ## Install
 
 ```bash
-npm i -g github:leofmds/peneira     # or: git clone https://github.com/leofmds/peneira && npm link
+npm i -g peneira
 peneira --version
 ```
 
-Installs one command: `peneira`.
+Installs one command: `peneira`. To try it without installing: `npx peneira <pr>`.
 
 Requires Node 22+, git, and a GitHub token (`GITHUB_TOKEN`, or just `gh auth login`).
 No runtime dependencies.
